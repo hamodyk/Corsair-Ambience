@@ -5,17 +5,17 @@
 #endif
 
 #include <iostream>
+#include <atomic>
 #include <thread>
 #include <vector>
 #include<windows.h>
 
 
-
 struct RGB { int red; int green; int blue; };
-
 int ScreenX = 0;
 int ScreenY = 0;
 BYTE* ScreenData = 0;
+auto continueExecution = true;
 
 void ScreenCap()
 {
@@ -76,9 +76,15 @@ RGB getPixelAvg()
 
 	for (int x = 0; x < ScreenX; x = x + stepX) {
 		for (int y = 0; y < ScreenY; y = y + stepY) {
-			sumRed = sumRed + PosR(x, y);
-			sumGreen = sumGreen + PosG(x, y);
-			sumBlue = sumBlue + PosB(x, y);
+			int pixelRed = PosR(x, y);
+			int pixelGreen = PosG(x, y);
+			int pixelBlue= PosB(x, y);
+			if (pixelRed + pixelGreen + pixelBlue < 50) {
+				continue;
+			}
+			sumRed = sumRed + pixelRed;
+			sumGreen = sumGreen + pixelGreen;
+			sumBlue = sumBlue + pixelBlue;
 		}
 	}
 
@@ -193,8 +199,21 @@ void setLedsColor(RGB avgRgb, std::vector<CorsairLedColor> &ledColorsVec) {
 	CorsairSetLedsColorsAsync(static_cast<int>(ledColorsVec.size()), ledColorsVec.data(), nullptr, nullptr);
 }
 
+
+
+
+BOOL ctrl_handler(DWORD event)
+{
+	if (event == CTRL_CLOSE_EVENT) {
+		continueExecution = false;
+		return TRUE;
+	}
+	return FALSE;
+}
+
 int main()
 {
+	SetConsoleCtrlHandler((PHANDLER_ROUTINE)(ctrl_handler), TRUE);
 	CorsairPerformProtocolHandshake();
 	if (const auto error = CorsairGetLastError()) {
 		std::cout << "Handshake failed: " << toString(error) << "\nPress any key to quit." << std::endl;
@@ -209,7 +228,7 @@ int main()
 	}
 
 	std::thread lightingThread([&colorsVector] {
-		while (1) {
+		while (continueExecution) {
 			ScreenCap();
 			setLedsColor(getPixelAvg(), colorsVector);
 			//Sleep(500);
