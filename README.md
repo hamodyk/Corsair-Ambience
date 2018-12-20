@@ -17,7 +17,7 @@ Corsair RGB Ambience - Set your Corsair devices' led colors based on what you se
 - Performance impact testing
 
 # Q&A
-Q- Does the app also work while gaming?
+Q- Does the app also work while using fullscreen applications such as games?
 
 A- Yes
 
@@ -40,3 +40,6 @@ Every Corsair RGB device should be compatible with this software except:
 - Liquid cooling solutions
 
 Reason: Lack of SDK on Corsair's side
+
+# Donation
+If you enjoy this application and would like to support its development, here's my paypal link: https://www.paypal.me/cytrixghost
