@@ -60,6 +60,9 @@ I'm getting the following error - "Handshake failed: CE_ServerNotFound"
 Make sure you have started iCUE or CUE, and make sure that the "Enable SDK" option is ticked in the settings. If it's already on, try to untick it and then tick it back.
 
 # Donations
-If you enjoy this application and would like to support its development, here's my paypal link: https://www.paypal.me/cytrixghost
+If you enjoy this application and would like to support its development: 
 
-I also accept Steam gifts, link will be added later
+- Paypal: https://www.paypal.me/cytrixghost
+- Steam: (will be added later)
+
+Thanks :)
