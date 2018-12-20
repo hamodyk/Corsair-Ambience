@@ -2,9 +2,25 @@
 Corsair RGB Ambience - Set your Corsair devices' led colors based on what you see in your screen
 
 
+# Download & Run
+Download the app from here: https://drive.google.com/open?id=1o6pSWMzm8f0APzhX-hu9fbXTHlgnO2pN
+
+To run it, simply open the .rar file and double click on "Corsair Ambience.exe"
+
+# Project installation
+To install and debug the project you need to do the following:
+
+1. Start a C++ console project in Visual Studio 2017
+2. Copy include, lib and redist folder into the Root of the project
+3. Go to Project properties-->C/C++-->General-->Additional Include Directories, Add the follow line $(SolutionDir)include\
+4. Go to Project properties-->Linker->General-->Additional Library Directories, Add the follow line, $(SolutionDir)lib\x64\
+5. Go to Project properties-->Linker->Input-->Additional Dependencies, add follow line in front of it, CUESDK.x64_2013.lib;
+6. Go to Project properties-->Build Events-->Post-Build Event-->Command Line, add following line, xcopy /Y /I "$(SolutionDir)redist\x64\*" "$(OutDir)"
+7. Apply all of those
+
 
 # DISCLAIMERS: 
-- USE AT YOUR OWN RISK, I'M NOT RESPONSIBLE FOR ANY DAMAGES YOU CAUSE TO THE SYSTEM/HARDWARE THAT YOUR RUN/INSTALL THIS APPLICATION ON.
+- USE AT YOUR OWN RISK, I'M NOT RESPONSIBLE FOR ANY DAMAGES YOU CAUSE TO THE SYSTEM/HARDWARE THAT YOU RUN/INSTALL THIS APPLICATION ON.
 
 - I'M NOT ASSOCIATED/AFFILIATED WITH CORSAIR IN ANY SORT OF WAY. I'M JUST USING THEIR SDK.
 
