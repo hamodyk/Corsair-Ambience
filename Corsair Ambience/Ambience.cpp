@@ -5,7 +5,6 @@
 #endif
 
 #include <iostream>
-#include <atomic>
 #include <thread>
 #include <vector>
 #include<windows.h>
@@ -201,10 +200,9 @@ void setLedsColor(RGB avgRgb, std::vector<CorsairLedColor> &ledColorsVec) {
 
 
 
-
 BOOL ctrl_handler(DWORD event)
 {
-	if (event == CTRL_CLOSE_EVENT) {
+	if (event == CTRL_CLOSE_EVENT) { //Handling window close event
 		continueExecution = false;
 		return TRUE;
 	}
@@ -213,6 +211,7 @@ BOOL ctrl_handler(DWORD event)
 
 int main()
 {
+	std::cout << "Starting app" << std::endl;
 	SetConsoleCtrlHandler((PHANDLER_ROUTINE)(ctrl_handler), TRUE);
 	CorsairPerformProtocolHandshake();
 	if (const auto error = CorsairGetLastError()) {
@@ -224,8 +223,11 @@ int main()
 	auto colorsVector = getAvailableKeys();
 	std::cout << "Available LED keys: " << colorsVector.size() << std::endl;
 	if (colorsVector.empty()) {
+		std::cout << "No LED keys available, quitting..." << std::endl;
 		return 1;
 	}
+
+	std::cout << "Running..." << std::endl;
 
 	std::thread lightingThread([&colorsVector] {
 		while (continueExecution) {
