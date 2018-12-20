@@ -18,11 +18,21 @@ To install and debug the project you need to do the following:
 6. Go to Project properties-->Build Events-->Post-Build Event-->Command Line, add following line, xcopy /Y /I "$(SolutionDir)redist\x64\*" "$(OutDir)"
 7. Apply all of those
 
+Note: Your run mode (Debug or Release) must be set to x64 for the settings above to work
+
 
 # DISCLAIMERS: 
 - USE AT YOUR OWN RISK, I'M NOT RESPONSIBLE FOR ANY DAMAGES YOU CAUSE TO THE SYSTEM/HARDWARE THAT YOU RUN/INSTALL THIS APPLICATION ON.
 
 - I'M NOT ASSOCIATED/AFFILIATED WITH CORSAIR IN ANY SORT OF WAY. I'M JUST USING THEIR SDK.
+
+
+# Compatible Devices
+Every Corsair RGB device should be compatible with this software except:
+- RAM
+- Liquid cooling solutions
+
+Reason: Lack of SDK on Corsair's side
 
 # Road Map
 - Create a GUI
@@ -49,13 +59,7 @@ I'm getting the following error - "Handshake failed: CE_ServerNotFound"
 ### Solution: 
 Make sure you have started iCUE or CUE, and make sure that the "Enable SDK" option is ticked in the settings. If it's already on, try to untick it and then tick it back.
 
-
-# Compatible Devices
-Every Corsair RGB device should be compatible with this software except:
-- RAM
-- Liquid cooling solutions
-
-Reason: Lack of SDK on Corsair's side
-
-# Donation
+# Donations
 If you enjoy this application and would like to support its development, here's my paypal link: https://www.paypal.me/cytrixghost
+
+I also accept Steam gifts, link will be added later
