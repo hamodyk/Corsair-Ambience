@@ -2,6 +2,11 @@
 Corsair RGB Ambience - Set your Corsair devices' led colors based on what you see in your screen
 
 
+# Demo
+https://www.youtube.com/watch?v=Qqj28Wc86cg
+
+Keep in mind that this was filmed using my phone, so I can assure you it looks much better in real life.
+
 # Download & Run
 Download the app from here: https://drive.google.com/open?id=1o6pSWMzm8f0APzhX-hu9fbXTHlgnO2pN
 
@@ -40,6 +45,7 @@ Reason: Lack of SDK on Corsair's side
 - Add more coloring options (such as most dominant color, elimination of dark colors etc...)
 - Make it an installable app
 - Add option to start the app on Windows start up
+- Improve performance
 - Performance impact testing
 
 # Q&A
@@ -49,7 +55,7 @@ A- Yes
 
 Q- Will it hinder my computer's performance?
 
-A- The app uses ~ 1% - 1.5% CPU, so I wouldn't think so. Some actual performance impact testing is required though.
+A- The app uses ~ 1% - 2.5% CPU and 9 MB of RAM, so I wouldn't think so. Some actual performance impact testing is required though.
 
 
 # Troubleshooting
@@ -63,6 +69,6 @@ Make sure you have started iCUE or CUE, and make sure that the "Enable SDK" opti
 If you enjoy this application and would like to support its development: 
 
 - Paypal: https://www.paypal.me/cytrixghost
-- Steam: (will be added later)
+- Steam: https://steamcommunity.com/tradeoffer/new/?partner=63409948&token=qKZ6lsHT 
 
 Thanks :)
