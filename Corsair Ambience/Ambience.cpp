@@ -7,7 +7,7 @@
 #include <iostream>
 #include <thread>
 #include <vector>
-#include<windows.h>
+#include <windows.h>
 
 
 struct RGB { int red; int green; int blue; };
@@ -70,15 +70,17 @@ RGB getPixelAvg()
 	int sumRed = 0;
 	int sumGreen = 0;
 	int sumBlue = 0;
-	int stepX = 3;
-	int stepY = 3;
+	const int stepX = 3;
+	const int stepY = 3;
+	int numOfSkippedPixels = 0;
 
 	for (int x = 0; x < ScreenX; x = x + stepX) {
 		for (int y = 0; y < ScreenY; y = y + stepY) {
 			int pixelRed = PosR(x, y);
 			int pixelGreen = PosG(x, y);
 			int pixelBlue= PosB(x, y);
-			if (pixelRed + pixelGreen + pixelBlue < 50) {
+			if (pixelRed + pixelGreen + pixelBlue < 50) { //ignore dark colors as they just ruin the average
+				numOfSkippedPixels++;
 				continue;
 			}
 			sumRed = sumRed + pixelRed;
@@ -86,11 +88,20 @@ RGB getPixelAvg()
 			sumBlue = sumBlue + pixelBlue;
 		}
 	}
+	
+	const int totalScreenPixels = (ScreenX / stepX) * (ScreenY / stepY);
+	int totalFilteredPixels;
+	if (numOfSkippedPixels >= totalScreenPixels) {
+		totalFilteredPixels = totalScreenPixels; //to avoid cases such as division by zero or by a negative number, we should just ignore the skipped pixels
+	}
+	else {
+		totalFilteredPixels = totalScreenPixels - numOfSkippedPixels;
+	}
 
 	RGB avgRgb;
-	avgRgb.red = sumRed / ((ScreenX / stepX) * (ScreenY / stepY));
-	avgRgb.green = sumGreen / ((ScreenX / stepX) * (ScreenY / stepY));
-	avgRgb.blue = sumBlue / ((ScreenX / stepX) * (ScreenY / stepY));
+	avgRgb.red = sumRed / totalFilteredPixels;
+	avgRgb.green = sumGreen / totalFilteredPixels;
+	avgRgb.blue = sumBlue / totalFilteredPixels;
 
 	return avgRgb;
 }
@@ -223,17 +234,18 @@ int main()
 	auto colorsVector = getAvailableKeys();
 	std::cout << "Available LED keys: " << colorsVector.size() << std::endl;
 	if (colorsVector.empty()) {
-		std::cout << "No LED keys available, quitting..." << std::endl;
+		std::cout << "No LED keys available" << "\nPress any key to quit." << std::endl;
+		getchar();
 		return 1;
 	}
 
 	std::cout << "Running..." << std::endl;
 
+	
 	std::thread lightingThread([&colorsVector] {
 		while (continueExecution) {
 			ScreenCap();
 			setLedsColor(getPixelAvg(), colorsVector);
-			//Sleep(500);
 			std::this_thread::sleep_for(std::chrono::milliseconds(500));
 		}
 	});
