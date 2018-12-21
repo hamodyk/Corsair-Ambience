@@ -8,6 +8,7 @@
 #include <thread>
 #include <vector>
 #include <windows.h>
+#include <cstdlib>
 
 
 struct RGB { int red; int green; int blue; };
@@ -73,15 +74,20 @@ RGB getPixelAvg()
 	const int stepX = 3;
 	const int stepY = 3;
 	int numOfSkippedPixels = 0;
+	const int lowColorDiff = 25;
 
 	for (int x = 0; x < ScreenX; x = x + stepX) {
 		for (int y = 0; y < ScreenY; y = y + stepY) {
 			int pixelRed = PosR(x, y);
 			int pixelGreen = PosG(x, y);
 			int pixelBlue= PosB(x, y);
-			if (pixelRed + pixelGreen + pixelBlue < 50) { //ignore dark colors as they just ruin the average
+			if (pixelRed + pixelGreen + pixelBlue < 50 || pixelRed + pixelGreen + pixelBlue > 254*3) { 
 				numOfSkippedPixels++;
-				continue;
+				continue; //ignore extremely dark/bright colors as they just ruin the average
+			}
+			else if (abs(pixelRed - pixelGreen) <= lowColorDiff && abs(pixelRed - pixelBlue) <= lowColorDiff && abs(pixelGreen - pixelBlue) <= lowColorDiff) {
+				numOfSkippedPixels++;
+				continue; //I noticed that when the difference between R, G and B is less than a small number (say 25) then the color is "dark", thus it's better to skip it
 			}
 			sumRed = sumRed + pixelRed;
 			sumGreen = sumGreen + pixelGreen;
