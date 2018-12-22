@@ -9,6 +9,7 @@
 #include <vector>
 #include <windows.h>
 #include <cstdlib>
+#include <unordered_set>
 
 
 struct RGB { int red; int green; int blue; };
@@ -136,72 +137,48 @@ const char* toString(CorsairError error)
 
 std::vector<CorsairLedColor> getAvailableKeys()
 {
-	auto colorsVector = std::vector<CorsairLedColor>();
-	for (auto deviceIndex = 0; deviceIndex < CorsairGetDeviceCount(); deviceIndex++) {
-		if (auto deviceInfo = CorsairGetDeviceInfo(deviceIndex)) {
+	auto colorsSet = std::unordered_set<CorsairLedId>();
+	for (int deviceIndex = 0, size = CorsairGetDeviceCount(); deviceIndex < size; deviceIndex++) {
+		if (const auto deviceInfo = CorsairGetDeviceInfo(deviceIndex)) {
 			switch (deviceInfo->type) {
 			case CDT_Mouse: {
 				auto numberOfKeys = deviceInfo->physicalLayout - CPL_Zones1 + 1;
 				for (auto i = 0; i < numberOfKeys; i++) {
-					auto ledId = static_cast<CorsairLedId>(CLM_1 + i);
-					colorsVector.push_back(CorsairLedColor{ ledId, 0, 0, 0 });
+					const auto ledId = static_cast<CorsairLedId>(CLM_1 + i);
+					colorsSet.insert(ledId);
 				}
-			} break;
-			case CDT_Keyboard: {
-				auto ledPositions = CorsairGetLedPositions();
-				if (ledPositions) {
-					for (auto i = 0; i < ledPositions->numberOfLed; i++) {
-						auto ledId = ledPositions->pLedPosition[i].ledId;
-						colorsVector.push_back(CorsairLedColor{ ledId, 0, 0, 0 });
-					}
-				}
+				colorsSet.insert(static_cast<CorsairLedId>(CLM_5));
+				colorsSet.insert(static_cast<CorsairLedId>(CLM_6));
 			} break;
 			case CDT_Headset: {
-				colorsVector.push_back(CorsairLedColor{ CLH_LeftLogo, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLH_RightLogo, 0, 0, 0 });
+				colorsSet.insert(CLH_LeftLogo);
+				colorsSet.insert(CLH_RightLogo);
 			} break;
+			case CDT_Keyboard:
+			case CDT_MouseMat:
+			case CDT_HeadsetStand:
 			case CDT_CommanderPro:
-			case CDT_LightingNodePro: {
-				auto ledPositions = CorsairGetLedPositionsByDeviceIndex(deviceIndex);
+			case CDT_LightingNodePro:
+			case CDT_MemoryModule:
+			case CDT_Cooler: {
+				const auto ledPositions = CorsairGetLedPositionsByDeviceIndex(deviceIndex);
 				if (ledPositions) {
 					for (auto i = 0; i < ledPositions->numberOfLed; i++) {
-						auto ledId = ledPositions->pLedPosition[i].ledId;
-						colorsVector.push_back(CorsairLedColor{ ledId, 0, 0, 0 });
+						const auto ledId = ledPositions->pLedPosition[i].ledId;
+						colorsSet.insert(ledId);
 					}
 				}
-			} break;
-			case CDT_MouseMat: {
-				colorsVector.push_back(CorsairLedColor{ CLMM_Zone1, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLMM_Zone2, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLMM_Zone3, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLMM_Zone4, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLMM_Zone5, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLMM_Zone6, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLMM_Zone7, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLMM_Zone8, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLMM_Zone9, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLMM_Zone10, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLMM_Zone11, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLMM_Zone12, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLMM_Zone13, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLMM_Zone14, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLMM_Zone15, 0, 0, 0 });
-			} break;
-			case CDT_HeadsetStand: {
-				colorsVector.push_back(CorsairLedColor{ CLHSS_Zone1, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLHSS_Zone2, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLHSS_Zone3, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLHSS_Zone4, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLHSS_Zone5, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLHSS_Zone6, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLHSS_Zone7, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLHSS_Zone8, 0, 0, 0 });
-				colorsVector.push_back(CorsairLedColor{ CLHSS_Zone9, 0, 0, 0 });
 			} break;
 			default:
 				break;
 			}
 		}
+	}
+
+	std::vector<CorsairLedColor> colorsVector;
+	colorsVector.reserve(colorsSet.size());
+	for (const auto &ledId : colorsSet) {
+		colorsVector.push_back({ ledId, 0, 0, 0 });
 	}
 	return colorsVector;
 }

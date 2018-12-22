@@ -19,7 +19,9 @@ extern "C"
 		CDT_MouseMat = 4,
 		CDT_HeadsetStand = 5,
 		CDT_CommanderPro = 6,
-		CDT_LightingNodePro = 7
+		CDT_LightingNodePro = 7,
+		CDT_MemoryModule = 8,
+		CDT_Cooler = 9
 	};
 
 	enum CorsairPhysicalLayout	// contains list of available physical layouts for keyboards
@@ -63,8 +65,9 @@ extern "C"
 
 	enum CorsairDeviceCaps		// contains list of device capabilities
 	{
-		CDC_None = 0,				// for devices that do not support any SDK functions
-		CDC_Lighting = 1			// for devices that has controlled lighting
+		CDC_None           = 0x0000, // for devices that do not support any SDK functions
+		CDC_Lighting       = 0x0001, // for devices that has controlled lighting
+		CDC_PropertyLookup = 0x0002	 // for devices that provide current state through set of properties
 	};
 
 	enum CorsairAccessMode		// contains list of available SDK access modes
@@ -90,7 +93,22 @@ extern "C"
 		CCDT_LL_Fan = 3,
 		CCDT_ML_Fan = 4,
 		CCDT_Strip = 5,
-		CCDT_DAP = 6
+		CCDT_DAP = 6,
+		CCDT_Pump = 7
+	};
+
+	enum CorsairDevicePropertyType
+	{
+		CDPT_Boolean = 0x1000,
+		CDPT_Int32   = 0x2000
+	};
+
+	enum CorsairDevicePropertyId
+	{
+		CDPI_Headset_MicEnabled           = 0x1000, // indicates Mic state (On or Off)
+		CDPI_Headset_SurroundSoundEnabled = 0x1001, // indicates Surround Sound state (On or Off)
+		CDPI_Headset_SidetoneEnabled      = 0x1002, // indicates Sidetone state (On or Off)
+		CDPI_Headset_EqualizerPreset      = 0x2000  // the number of active equalizer preset (integer, 1 - 5)
 	};
 
 	struct CorsairChannelDeviceInfo		// contains information about separate LED-device connected to the channel controlled by the DIY-device.
@@ -209,6 +227,12 @@ extern "C"
 
 	// registers a callback that will be called by SDK when some of G or M keys are pressed or released
 	CORSAIR_LIGHTING_SDK_EXPORT bool CorsairRegisterKeypressCallback(void (*CallbackType)(void *context, CorsairKeyId keyId, bool pressed), void *context);
+
+	// returns one of the bool property of enum CorsairDevicePropertyId
+	CORSAIR_LIGHTING_SDK_EXPORT bool CorsairGetBoolPropertyValue(int deviceIndex, CorsairDevicePropertyId propertyId, bool *propertyValue);
+
+	// returns one of the int property of enum CorsairDevicePropertyId
+	CORSAIR_LIGHTING_SDK_EXPORT bool CorsairGetInt32PropertyValue(int deviceIndex, CorsairDevicePropertyId propertyId, int *propertyValue);
 
 #ifdef __cplusplus
 } //exten "C"
