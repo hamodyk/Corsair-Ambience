@@ -16,6 +16,8 @@ To run it, simply open the .rar file, inside it you'll find a folder called "Rel
 
 You can also extract the .rar file, which will create the Release folder with the .exe inside it.
 
+### Update: I've deployed a new version with support to RAM and CPU coolers, and also fixed an issue with the mouse. Use the same download link as before.
+
 # Project installation
 To install and debug the project you need to do the following:
 
