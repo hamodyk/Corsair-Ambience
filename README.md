@@ -49,13 +49,14 @@ Reason: Lack of SDK on Corsair's side
 - Add more coloring options (such as most dominant color, elimination of dark colors etc...)
 - Make it an installable app
 - Add option to start the app on Windows start up
+- Multi-monitor support
 - Improve performance
 - Performance impact testing
 
 # Q&A
 Q- Does the app also work while using fullscreen applications such as games?
 
-A- Yes
+A- Yes, but apparently it must be fullscreen windowed (not fullscreen exclusive)
 
 Q- Will it hinder my computer's performance?
 
