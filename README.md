@@ -37,11 +37,7 @@ Note: Your run mode (Debug or Release) must be set to x64 for the settings above
 
 
 # Compatible Devices
-Every Corsair RGB device should be compatible with this software except:
-- RAM
-- Liquid cooling solutions
-
-Reason: Lack of SDK on Corsair's side
+Every Corsair RGB device should be compatible with this software.
 
 # Road Map
 - Create a GUI
@@ -56,11 +52,11 @@ Reason: Lack of SDK on Corsair's side
 # Q&A
 Q- Does the app also work while using fullscreen applications such as games?
 
-A- Yes, but apparently it must be fullscreen windowed (not fullscreen exclusive)
+A- Yes, but apparently it must be fullscreen windowed or borderless (not fullscreen exclusive). Tested with PUBG, CSGO and Battlefield V.
 
 Q- Will it hinder my computer's performance?
 
-A- The app uses ~ 1% - 2.5% CPU and 9 MB of RAM, so I wouldn't think so. Some actual performance impact testing is required though.
+A- The app uses ~ 1% - 2.5% CPU and 15 MB of RAM, so I wouldn't think so. Some actual performance impact testing is required though.
 
 
 # Troubleshooting
