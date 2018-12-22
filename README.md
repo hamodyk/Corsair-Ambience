@@ -10,7 +10,11 @@ Keep in mind that this was filmed using my phone, so I can assure you it looks m
 # Download & Run
 Download the app from here: https://drive.google.com/open?id=1o6pSWMzm8f0APzhX-hu9fbXTHlgnO2pN
 
-To run it, simply open the .rar file and double click on "Corsair Ambience.exe"
+The download button should be on the top right corner of your screen.
+
+To run it, simply open the .rar file, inside it you'll find a folder called "Release", open it and double click on "Corsair Ambience.exe".
+
+You can also extract the .rar file, which will create the Release folder with the .exe inside it.
 
 # Project installation
 To install and debug the project you need to do the following:
