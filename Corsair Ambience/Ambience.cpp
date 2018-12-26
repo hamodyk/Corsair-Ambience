@@ -7,22 +7,32 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <atomic>
 #include <windows.h>
 #include <cstdlib>
 #include <unordered_set>
+#include <iostream>
 
 
 struct RGB { int red; int green; int blue; };
 int ScreenX = 0;
 int ScreenY = 0;
 BYTE* ScreenData = 0;
-auto continueExecution = true;
+std::atomic_bool continueExecution{ true };
+std::atomic_bool multiMonitorSupport{ true };
+std::atomic_int sleepDuration{ 500 };
 
 void ScreenCap()
 {
 	HDC hScreen = GetDC(GetDesktopWindow());
-	ScreenX = GetDeviceCaps(hScreen, HORZRES);
-	ScreenY = GetDeviceCaps(hScreen, VERTRES);
+	if (multiMonitorSupport.load()) {
+		ScreenX = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+		ScreenY = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+	}
+	else {
+		ScreenX = GetDeviceCaps(hScreen, HORZRES);
+		ScreenY = GetDeviceCaps(hScreen, VERTRES);
+	}
 
 	HDC hdcMem = CreateCompatibleDC(hScreen);
 	HBITMAP hBitmap = CreateCompatibleBitmap(hScreen, ScreenX, ScreenY);
@@ -193,7 +203,6 @@ void setLedsColor(RGB avgRgb, std::vector<CorsairLedColor> &ledColorsVec) {
 }
 
 
-
 BOOL ctrl_handler(DWORD event)
 {
 	if (event == CTRL_CLOSE_EVENT) { //Handling window close event
@@ -203,13 +212,76 @@ BOOL ctrl_handler(DWORD event)
 	return FALSE;
 }
 
+void printRefeshInterval() {
+	std::cout << "Refresh interval set to " << sleepDuration.load() << " milliseconds" << std::endl;
+}
+
+void printOptions() {
+	std::cout << "\nOptions:" << std::endl;
+	std::cout << "+ : increase the color refresh interval by 100ms (less CPU usage)" << std::endl;
+	std::cout << "- : decrease the color refresh interval by 100ms (more CPU usage)" << std::endl;
+	std::cout << "1 : single monitor mode (disable multi-monitor support - less CPU usage)" << std::endl;
+	std::cout << "2 : multi-monitor mode" << std::endl;
+	std::cout << "o : print the options" << std::endl;
+	std::cout << "q : quit the app\n" << std::endl;
+}
+
+void handleConfigurations() {
+	while (continueExecution) {
+		char c = getchar();
+		switch (c) {
+			case '-':
+				if (sleepDuration.load() > 100) {
+					sleepDuration -= 100;
+					printRefeshInterval();
+				}
+				else {
+					std::cout << "Cannot decrease the refesh interval any further" << std::endl;
+				}
+				break;
+			case '+':
+				if (sleepDuration.load() < 1000) {
+					sleepDuration += 100;
+					printRefeshInterval();
+				}
+				else {
+					std::cout << "Cannot increase the refesh interval any further" << std::endl;
+				}
+				break;
+			case '1':
+				multiMonitorSupport = false;
+				std::cout << "Multi-monitor support is OFF. Using only the primary monitor to calculate the average.\n" << std::endl;
+				break;
+			case '2':
+				multiMonitorSupport = true;
+				std::cout << "Multi-monitor support is ON. Using all monitors to calculate the average.\n" << std::endl;
+				break;
+			case 'o':
+			case 'O':
+				printOptions();
+				break;
+			case 'Q':
+			case 'q':
+				continueExecution = false;
+				break;
+			default:
+				break;
+			}
+	}
+}
+
+
 int main()
 {
 	std::cout << "Starting app" << std::endl;
 	SetConsoleCtrlHandler((PHANDLER_ROUTINE)(ctrl_handler), TRUE);
 	CorsairPerformProtocolHandshake();
 	if (const auto error = CorsairGetLastError()) {
-		std::cout << "Handshake failed: " << toString(error) << "\nPress any key to quit." << std::endl;
+		std::cout << "Handshake failed: " << toString(error) << "\n" << std::endl;
+		std::cout << "Please make sure that either iCUE or CUE are running before you start the app." << std::endl;
+		std::cout << "Also, make sure that \"Enable SDK\" is ticked in the settings." << std::endl;
+		std::cout << "If it's already on, try to set it to off then back on again.\n" << std::endl;
+		std::cout << "Enter any key to quit..." << std::endl;
 		getchar();
 		return -1;
 	}
@@ -222,18 +294,24 @@ int main()
 		return 1;
 	}
 
+	std::cout << "Using default refresh interval: " << sleepDuration.load() << " milliseconds" << std::endl;
+	std::cout << "Multi-monitor mode is ON\n" << std::endl;
 	std::cout << "Running..." << std::endl;
-
+	printOptions();
 	
 	std::thread lightingThread([&colorsVector] {
 		while (continueExecution) {
 			ScreenCap();
 			setLedsColor(getPixelAvg(), colorsVector);
-			std::this_thread::sleep_for(std::chrono::milliseconds(500));
+			std::this_thread::sleep_for(std::chrono::milliseconds(sleepDuration.load()));
 		}
 	});
+	
+	handleConfigurations();
 
 	lightingThread.join();
 
 	return 0;
 }
+
+
