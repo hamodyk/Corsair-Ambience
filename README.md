@@ -9,7 +9,7 @@ Keep in mind that this was filmed using my phone, so I can assure you it looks m
 
 # Download & Run
 
-[Click here to download the latest version (v1.1)](https://github.com/hamodyk/Corsair-Ambience/releases/download/v1.1/Release.rar)
+[Click here to download the latest version (v1.2)](https://github.com/hamodyk/Corsair-Ambience/releases/download/v1.2/Release.rar)
 
 #### Please make sure that you have either iCUE or CUE running before you start the app.
 
