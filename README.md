@@ -8,9 +8,10 @@ https://www.youtube.com/watch?v=Qqj28Wc86cg
 Keep in mind that this was filmed using my phone, so I can assure you it looks much better in real life.
 
 # Download & Run
-Download the app from here: https://drive.google.com/open?id=1o6pSWMzm8f0APzhX-hu9fbXTHlgnO2pN
 
-The download button should be on the top right corner of your screen.
+[Click here to download the latest version (v1.1)](https://github.com/hamodyk/Corsair-Ambience/releases/download/v1.1/Release.rar)
+
+#### Please make sure that you have either iCUE or CUE running before you start the app.
 
 To run it, simply open the .rar file, inside it you'll find a folder called "Release", open it and double click on "Corsair Ambience.exe".
 
@@ -37,11 +38,7 @@ Note: Your run mode (Debug or Release) must be set to x64 for the settings above
 
 
 # Compatible Devices
-Every Corsair RGB device should be compatible with this software except:
-- RAM
-- Liquid cooling solutions
-
-Reason: Lack of SDK on Corsair's side
+Every Corsair RGB device should be compatible with this software.
 
 # Road Map
 - Create a GUI
@@ -56,11 +53,11 @@ Reason: Lack of SDK on Corsair's side
 # Q&A
 Q- Does the app also work while using fullscreen applications such as games?
 
-A- Yes, but apparently it must be fullscreen windowed (not fullscreen exclusive)
+A- Yes, but apparently it must be fullscreen windowed or borderless (not fullscreen exclusive). Tested with PUBG, CSGO and Battlefield V.
 
 Q- Will it hinder my computer's performance?
 
-A- The app uses ~ 1% - 2.5% CPU and 9 MB of RAM, so I wouldn't think so. Some actual performance impact testing is required though.
+A- The app uses ~ 1% - 2.5% CPU and 15 MB of RAM, so I wouldn't think so. Some actual performance impact testing is required though.
 
 
 # Troubleshooting
