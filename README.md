@@ -46,18 +46,22 @@ Every Corsair RGB device should be compatible with this software.
 - Add more coloring options (such as most dominant color, elimination of dark colors etc...)
 - Make it an installable app
 - Add option to start the app on Windows start up
-- Multi-monitor support
+- Multi-monitor support - *done*
 - Improve performance
 - Performance impact testing
 
 # Q&A
-Q- Does the app also work while using fullscreen applications such as games?
+Q: Does the app also work while using fullscreen applications such as games?
 
-A- Yes, but apparently it must be fullscreen windowed or borderless (not fullscreen exclusive). Tested with PUBG, CSGO and Battlefield V.
+A: Yes, but apparently it must be fullscreen windowed or borderless (not fullscreen exclusive). Tested with PUBG, CSGO and Battlefield V.
 
-Q- Will it hinder my computer's performance?
+Q: Will it hinder my computer's performance?
 
-A- The app uses ~ 1% - 2.5% CPU and 15 MB of RAM, so I wouldn't think so. Some actual performance impact testing is required though.
+A: The app uses ~ 1% - 2.5% CPU and 15 MB of RAM, so I wouldn't think so. Some actual performance impact testing is required though.
+
+Q: Does it support multi-monitor setups?
+
+A: Yes
 
 
 # Troubleshooting
