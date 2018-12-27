@@ -11,7 +11,6 @@
 #include <windows.h>
 #include <cstdlib>
 #include <unordered_set>
-#include <iostream>
 
 
 struct RGB { int red; int green; int blue; };
