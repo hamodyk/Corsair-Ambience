@@ -1,4 +1,7 @@
 # Corsair Ambience
+![](https://img.shields.io/github/downloads/hamodyk/Corsair-Ambience/total.svg)
+![](https://img.shields.io/github/license/hamodyk/Corsair-Ambience.svg)
+
 A very lightweight app that allows you to set your devices' led colors based on what you see on your screen.
 
 
@@ -47,11 +50,11 @@ Notes:
 
 # Road Map
 - Create a GUI
-- Add more configurations (such as sleep time, number of pixels to sample etc...) - *done*
+- Add more configurations (such as sleep time, number of pixels to sample etc...) - ![](https://img.shields.io/badge/status-done-brightgreen.svg)
 - Add more coloring options (such as most dominant color, elimination of dark colors etc...)
 - Make it an installable app
 - Add option to start the app on Windows start up
-- Multi-monitor support - *done*
+- Multi-monitor support - ![](https://img.shields.io/badge/status-done-brightgreen.svg)
 - Improve performance
 - Performance impact testing
 
@@ -70,9 +73,9 @@ A: Yes
 
 # Dependencies
 
-- https://github.com/curl/curl - for getting the latest version of the app from Github
-- https://github.com/nlohmann/json - for parsing curl's http response as json and extracting the latest version
-- https://github.com/brofield/simpleini - for the parsing the settings file
+- [Libcurl](https://github.com/curl/curl) - for using http requests get the latest version of the app from Github
+- [JSON for modern C++](https://github.com/nlohmann/json) - for parsing curl's http response as json and extracting the latest version
+- [SimpleINI](https://github.com/brofield/simpleini) - for the parsing the settings file
 
 # Donations
 If you enjoy this application and would like to support its development: 
