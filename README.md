@@ -1,5 +1,5 @@
-# Corsair-Ambience
-Corsair RGB Ambience - Set your Corsair devices' led colors based on what you see in your screen
+# Corsair Ambience
+A very lightweight app that allows you to set your devices' led colors based on what you see on your screen.
 
 
 # Demo
@@ -9,7 +9,7 @@ Keep in mind that this was filmed using my phone, so I can assure you it looks m
 
 # Download & Run
 
-[Click here to download the latest version (v1.2)](https://github.com/hamodyk/Corsair-Ambience/releases/download/v1.2/Release.rar)
+[Click here to download the latest version (v1.3)](https://github.com/hamodyk/Corsair-Ambience/releases/download/v1.3/Corsair.Ambience.v1.3.rar)
 
 #### Please make sure that you have either iCUE or CUE running before you start the app.
 
@@ -22,13 +22,17 @@ To install and debug the project you need to do the following:
 
 1. Start a C++ console project in Visual Studio 2017
 2. Copy include, lib and redist folder into the Root of the project
-3. Go to Project properties-->C/C++-->General-->Additional Include Directories, Add the follow line $(SolutionDir)include\
-4. Go to Project properties-->Linker->General-->Additional Library Directories, Add the follow line, $(SolutionDir)lib\x64\
-5. Go to Project properties-->Linker->Input-->Additional Dependencies, add follow line in front of it, CUESDK.x64_2013.lib;
-6. Go to Project properties-->Build Events-->Post-Build Event-->Command Line, add following line, xcopy /Y /I "$(SolutionDir)redist\x64\*" "$(OutDir)"
+3. Go to Project properties-->C/C++-->General-->Additional Include Directories, Add the follow line: $(SolutionDir)include\
+4. Go to Project properties-->Linker->General-->Additional Library Directories, Add the follow line: $(SolutionDir)lib\x64\
+5. Go to Project properties-->Linker->Input-->Additional Dependencies, add follow line in front of it: libcurl.lib;CUESDK.x64_2013.lib;
+6. Go to Project properties-->Build Events-->Pre-Build Event-->Command Line, add following line: xcopy  /Y /I  "$(SolutionDir)settings.ini" "$(OutDir)"
+6. Go to Project properties-->Build Events-->Post-Build Event-->Command Line, add following line: xcopy /Y /I "$(SolutionDir)redist\x64\*" "$(OutDir)"
 7. Apply all of those
 
-Note: Your run mode (Debug or Release) must be set to x64 for the settings above to work
+Notes: 
+- All of the above should already be set for you if you just clone the project
+- You might need to retarget the solution (Right click on the Solution 'Corsair Ambience' then choose 'Retarget solution')
+- Your run mode (Debug or Release) must be set to x64 for the settings above to work
 
 
 # DISCLAIMERS: 
@@ -37,8 +41,9 @@ Note: Your run mode (Debug or Release) must be set to x64 for the settings above
 - I'M NOT ASSOCIATED/AFFILIATED WITH CORSAIR IN ANY SORT OF WAY. I'M JUST USING THEIR SDK.
 
 
-# Compatible Devices
-Every Corsair RGB device should be compatible with this software.
+# Compatibility
+- Windows (64 bit)
+- Every Corsair RGB device (as of 29/12/2018)
 
 # Road Map
 - Create a GUI
@@ -57,19 +62,17 @@ A: Yes, but apparently it must be fullscreen windowed or borderless (not fullscr
 
 Q: Will it hinder my computer's performance?
 
-A: The app uses ~ 1% - 2.5% CPU and 15 MB of RAM, so I wouldn't think so. Some actual performance impact testing is required though.
+A: No. The app is very lightweight as it uses only ~ 1% - 2.5% CPU (tested on my i5 3570k) and 15 MB of RAM. You can also configure it to make it even less CPU demanding.
 
 Q: Does it support multi-monitor setups?
 
 A: Yes
 
+# Dependencies
 
-# Troubleshooting
-### Problem:
-I'm getting the following error - "Handshake failed: CE_ServerNotFound"
-
-### Solution: 
-Make sure you have started iCUE or CUE, and make sure that the "Enable SDK" option is ticked in the settings. If it's already on, try to untick it and then tick it back.
+- https://github.com/curl/curl - for getting the latest version of the app from Github
+- https://github.com/nlohmann/json - for parsing curl's http response as json and extracting the latest version
+- https://github.com/brofield/simpleini - for the parsing the settings file
 
 # Donations
 If you enjoy this application and would like to support its development: 
