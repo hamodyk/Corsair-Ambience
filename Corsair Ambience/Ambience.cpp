@@ -226,13 +226,15 @@ void printRefeshInterval() {
 }
 
 void printOptions() {
-	std::cout << "\nOptions:" << std::endl;
-	std::cout << "+ : increase the color refresh interval by 100ms (less CPU usage)" << std::endl;
-	std::cout << "- : decrease the color refresh interval by 100ms (more CPU usage)" << std::endl;
-	std::cout << "1 : single monitor mode (disable multi-monitor support - less CPU usage)" << std::endl;
-	std::cout << "2 : multi-monitor mode" << std::endl;
-	std::cout << "o : print the options" << std::endl;
-	std::cout << "q : quit the app\n" << std::endl;
+	std::string options = "";
+	options = options + "\nOptions:" + "\n";
+	options = options + "+ : increase the color refresh interval by 100ms (less CPU usage)" + "\n";
+	options = options + "- : decrease the color refresh interval by 100ms (more CPU usage)" + "\n";
+	options = options + "1 : single monitor mode (disable multi-monitor support - less CPU usage)" + "\n";
+	options = options + "2 : multi-monitor mode" + "\n";
+	options = options + "o : print the options" + "\n";
+	options = options + "q : quit the app\n" + "\n";
+	std::cout << options << std::endl;
 }
 
 bool stringToBool(std::string str) {
@@ -355,66 +357,74 @@ size_t CurlWrite_CallbackFunc_StdString(void *contents, size_t size, size_t nmem
 	return size * nmemb;
 }
 
-int checkForAnUpdate() {
-	CURL *curl;
-	CURLcode res;
-	std::string response;
-	curl_global_init(CURL_GLOBAL_DEFAULT);
-	struct curl_slist *list = NULL;
-	curl = curl_easy_init();
-	if (curl) {
-		curl_easy_setopt(curl, CURLOPT_URL, "https://api.github.com/repos/hamodyk/Corsair-Ambience/releases/latest");
-		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString);
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-		list = curl_slist_append(list, "User-Agent: C/1.0");
-		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
+void checkForAnUpdate() {
+	try {
+		CURL *curl;
+		CURLcode res;
+		std::string response;
+		curl_global_init(CURL_GLOBAL_DEFAULT);
+		struct curl_slist *list = NULL;
+		curl = curl_easy_init();
+		if (curl) {
+			curl_easy_setopt(curl, CURLOPT_URL, "https://api.github.com/repos/hamodyk/Corsair-Ambience/releases/latest");
+			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString);
+			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+			list = curl_slist_append(list, "User-Agent: C/1.0");
+			curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
 
-		#ifdef SKIP_PEER_VERIFICATION
-		/*
-		* If you want to connect to a site who isn't using a certificate that is
-		* signed by one of the certs in the CA bundle you have, you can skip the
-		* verification of the server's certificate. This makes the connection
-		* A LOT LESS SECURE.
-		*
-		* If you have a CA cert for the server stored someplace else than in the
-		* default bundle, then the CURLOPT_CAPATH option might come handy for
-		* you.
-		*/
-		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-		#endif
+			#ifdef SKIP_PEER_VERIFICATION
+			/*
+			* If you want to connect to a site who isn't using a certificate that is
+			* signed by one of the certs in the CA bundle you have, you can skip the
+			* verification of the server's certificate. This makes the connection
+			* A LOT LESS SECURE.
+			*
+			* If you have a CA cert for the server stored someplace else than in the
+			* default bundle, then the CURLOPT_CAPATH option might come handy for
+			* you.
+			*/
+			curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+			#endif
 
-		#ifdef SKIP_HOSTNAME_VERIFICATION
-		/*
-		* If the site you're connecting to uses a different host name that what
-		* they have mentioned in their server certificate's commonName (or
-		* subjectAltName) fields, libcurl will refuse to connect. You can skip
-		* this check, but this will make the connection less secure.
-		*/
-		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-		#endif
+			#ifdef SKIP_HOSTNAME_VERIFICATION
+			/*
+			* If the site you're connecting to uses a different host name that what
+			* they have mentioned in their server certificate's commonName (or
+			* subjectAltName) fields, libcurl will refuse to connect. You can skip
+			* this check, but this will make the connection less secure.
+			*/
+			curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+			#endif
 
-		/* Perform the request, res will get the return code */
-		res = curl_easy_perform(curl);
-		/* Check for errors */
-		if (res != CURLE_OK)
-			fprintf(stderr, "curl_easy_perform() failed: %s\n",
-				curl_easy_strerror(res));
+			/* Perform the request, res will get the return code */
+			res = curl_easy_perform(curl);
+			/* Check for errors */
+			if (res != CURLE_OK) {
+				//fprintf(stderr, "curl_easy_perform() failed: %s\n",curl_easy_strerror(res));
+				std::cout << "Error: Unable to retrieve information about the latest version from Github" << std::endl;
+				std::cout << curl_easy_strerror(res) << "\n" << std::endl;
+				return;
+			}
 
-		/* always cleanup */
-		curl_easy_cleanup(curl);
-		curl_slist_free_all(list);
+			/* always cleanup */
+			curl_easy_cleanup(curl);
+			curl_slist_free_all(list);
+		}
+
+		curl_global_cleanup();
+
+		auto js = json::parse(response);
+		std::string latestVersion = js["tag_name"];
+		std::string currentVersion = version;
+		if (latestVersion.compare(currentVersion) != 0) { //if they are not equal
+			std::cout << "a new version (" << latestVersion << ") is available to download!" << std::endl;
+			std::cout << "Visit " << "https://github.com/hamodyk/Corsair-Ambience" << " for more info" << std::endl;
+		}
 	}
-
-	curl_global_cleanup();
-
-	auto js = json::parse(response);
-	std::string latestVersion = js["tag_name"];
-	std::string currentVersion = version;
-	if (latestVersion.compare(currentVersion) != 0) { //if they are not equal
-		std::cout << "a new version (" << latestVersion << ") is available to download!" << std::endl;
-		std::cout << "Visit " << "https://github.com/hamodyk/Corsair-Ambience" << " for more info" << std::endl;
+	catch (const std::exception& e) {
+		std::cout << "Error: Unable to retrieve information about the latest version from Github" << std::endl;
+		std::cout << e.what() << "\n" << std::endl;
 	}
-	return 0;
 }
 
 
