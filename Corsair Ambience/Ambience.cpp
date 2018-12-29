@@ -4,6 +4,8 @@
 #include <CUESDK.h>
 #endif
 
+
+#include <curl/curl.h>
 #include <iostream>
 #include <thread>
 #include <vector>
@@ -11,15 +13,27 @@
 #include <windows.h>
 #include <cstdlib>
 #include <unordered_set>
+#include <SimpleIni.h>
+#include <nlohmann/json.hpp>
 
+#define version "v1.3"
+#define settingsFileName "settings.ini"
+
+using json = nlohmann::json;
 
 struct RGB { int red; int green; int blue; };
 int ScreenX = 0;
 int ScreenY = 0;
+int stepX = 5;
+int stepY = 5;
 BYTE* ScreenData = 0;
+CSimpleIniA ini;
+
+
 std::atomic_bool continueExecution{ true };
 std::atomic_bool multiMonitorSupport{ true };
 std::atomic_int sleepDuration{ 500 };
+bool checkForUpdateFF = true;
 
 void ScreenCap()
 {
@@ -81,8 +95,7 @@ RGB getPixelAvg()
 	int sumRed = 0;
 	int sumGreen = 0;
 	int sumBlue = 0;
-	const int stepX = 3;
-	const int stepY = 3;
+
 	int numOfSkippedPixels = 0;
 	const int lowColorDiff = 25;
 
@@ -124,28 +137,26 @@ RGB getPixelAvg()
 
 
 
-const char* toString(CorsairError error)
-{
+const char* toString(CorsairError error){
 	switch (error) {
-	case CE_Success:
-		return "CE_Success";
-	case CE_ServerNotFound:
-		return "CE_ServerNotFound";
-	case CE_NoControl:
-		return "CE_NoControl";
-	case CE_ProtocolHandshakeMissing:
-		return "CE_ProtocolHandshakeMissing";
-	case CE_IncompatibleProtocol:
-		return "CE_IncompatibleProtocol";
-	case CE_InvalidArguments:
-		return "CE_InvalidArguments";
-	default:
-		return "unknown error";
+		case CE_Success:
+			return "CE_Success";
+		case CE_ServerNotFound:
+			return "CE_ServerNotFound";
+		case CE_NoControl:
+			return "CE_NoControl";
+		case CE_ProtocolHandshakeMissing:
+			return "CE_ProtocolHandshakeMissing";
+		case CE_IncompatibleProtocol:
+			return "CE_IncompatibleProtocol";
+		case CE_InvalidArguments:
+			return "CE_InvalidArguments";
+		default:
+			return "unknown error";
 	}
 }
 
-std::vector<CorsairLedColor> getAvailableKeys()
-{
+std::vector<CorsairLedColor> getAvailableKeys(){
 	auto colorsSet = std::unordered_set<CorsairLedId>();
 	for (int deviceIndex = 0, size = CorsairGetDeviceCount(); deviceIndex < size; deviceIndex++) {
 		if (const auto deviceInfo = CorsairGetDeviceInfo(deviceIndex)) {
@@ -202,8 +213,7 @@ void setLedsColor(RGB avgRgb, std::vector<CorsairLedColor> &ledColorsVec) {
 }
 
 
-BOOL ctrl_handler(DWORD event)
-{
+BOOL ctrl_handler(DWORD event){
 	if (event == CTRL_CLOSE_EVENT) { //Handling window close event
 		continueExecution = false;
 		return TRUE;
@@ -225,7 +235,65 @@ void printOptions() {
 	std::cout << "q : quit the app\n" << std::endl;
 }
 
+bool stringToBool(std::string str) {
+	if (str.compare("true") == 0 || str.compare("on") == 0 || str.compare("1") == 0) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+void printLoadedSettings() {
+	std::cout << "Refresh interval: " << sleepDuration.load() << " milliseconds" << std::endl;
+	std::cout << "Horizontal Step: " << stepX << std::endl;
+	std::cout << "Vertical Step: " << stepY << std::endl;
+	std::cout << "Check for an update on start up is " << (checkForUpdateFF ? "ON" : "OFF") << std::endl;
+	std::cout << "Multi-monitor mode is " << (multiMonitorSupport ? "ON" : "OFF") << "\n" << std::endl;
+}
+
+
+int getConfigValAsInt(const char* section, const char* key, int defaultVal, int rangeLowerBound, int rangeUpperBound) {
+	int res;
+	try {
+		res = std::stoi(ini.GetValue(section, key), nullptr);
+		if (rangeLowerBound && rangeUpperBound && (res < rangeLowerBound || res > rangeUpperBound)) {
+			std::cout << "Error: the setting \"" <<  key << "\" must be between " << rangeLowerBound << " and " << rangeUpperBound << std::endl;
+			std::cout << "Using a default value instead: " << defaultVal << "\n" << std::endl;
+			res = defaultVal;
+		}
+	}
+	catch (const std::exception&) {
+		std::cout << "Failed to read the value of " << key << " from the settings file" << std::endl;
+		std::cout << "Using a default value instead: " << defaultVal << "\n" << std::endl;
+		res = defaultVal;
+	}
+	return res;
+}
+
+void handleFileConfigurations() {
+	ini.SetUnicode();
+	int rc = ini.LoadFile(settingsFileName);
+	if (rc < 0) {
+		std::cout << "Failed to load the settings file: " << settingsFileName << std::endl;
+		return;
+	}
+
+	sleepDuration = getConfigValAsInt("CONFIGS", "refreshInterval", sleepDuration, 15, 1000);
+
+	stepX = getConfigValAsInt("CONFIGS", "horizontalStep", stepX, 1, 32);
+	stepY = getConfigValAsInt("CONFIGS", "verticalStep", stepY, 1, 32);
+
+	multiMonitorSupport = stringToBool(ini.GetValue("CONFIGS", "multiMonitorSupport"));
+	checkForUpdateFF = stringToBool(ini.GetValue("CONFIGS", "checkForUpdateOnStartup"));
+}
+
 void handleConfigurations() {
+
+	printLoadedSettings();
+
+	printOptions();
+
 	while (continueExecution) {
 		char c = getchar();
 		switch (c) {
@@ -270,10 +338,100 @@ void handleConfigurations() {
 }
 
 
+size_t CurlWrite_CallbackFunc_StdString(void *contents, size_t size, size_t nmemb, std::string *s){
+	size_t newLength = size * nmemb;
+	size_t oldLength = s->size();
+	try{
+		s->resize(oldLength + newLength);
+	}
+	catch (std::bad_alloc &e){
+		//handle memory problem
+		std::cout << "Error: couldn't allocate enough memory for the HTTP response" << std::endl;
+		std::cout << e.what() << std::endl;
+		return 0;
+	}
+
+	std::copy((char*)contents, (char*)contents + newLength, s->begin() + oldLength);
+	return size * nmemb;
+}
+
+int checkForAnUpdate() {
+	CURL *curl;
+	CURLcode res;
+	std::string response;
+	curl_global_init(CURL_GLOBAL_DEFAULT);
+	struct curl_slist *list = NULL;
+	curl = curl_easy_init();
+	if (curl) {
+		curl_easy_setopt(curl, CURLOPT_URL, "https://api.github.com/repos/hamodyk/Corsair-Ambience/releases/latest");
+		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+		list = curl_slist_append(list, "User-Agent: C/1.0");
+		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
+
+		#ifdef SKIP_PEER_VERIFICATION
+		/*
+		* If you want to connect to a site who isn't using a certificate that is
+		* signed by one of the certs in the CA bundle you have, you can skip the
+		* verification of the server's certificate. This makes the connection
+		* A LOT LESS SECURE.
+		*
+		* If you have a CA cert for the server stored someplace else than in the
+		* default bundle, then the CURLOPT_CAPATH option might come handy for
+		* you.
+		*/
+		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+		#endif
+
+		#ifdef SKIP_HOSTNAME_VERIFICATION
+		/*
+		* If the site you're connecting to uses a different host name that what
+		* they have mentioned in their server certificate's commonName (or
+		* subjectAltName) fields, libcurl will refuse to connect. You can skip
+		* this check, but this will make the connection less secure.
+		*/
+		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+		#endif
+
+		/* Perform the request, res will get the return code */
+		res = curl_easy_perform(curl);
+		/* Check for errors */
+		if (res != CURLE_OK)
+			fprintf(stderr, "curl_easy_perform() failed: %s\n",
+				curl_easy_strerror(res));
+
+		/* always cleanup */
+		curl_easy_cleanup(curl);
+		curl_slist_free_all(list);
+	}
+
+	curl_global_cleanup();
+
+	auto js = json::parse(response);
+	std::string latestVersion = js["tag_name"];
+	std::string currentVersion = version;
+	if (latestVersion.compare(currentVersion) != 0) { //if they are not equal
+		std::cout << "a new version (" << latestVersion << ") is available to download!" << std::endl;
+		std::cout << "Visit " << "https://github.com/hamodyk/Corsair-Ambience" << " for more info" << std::endl;
+	}
+	return 0;
+}
+
+
 int main()
 {
 	std::cout << "Starting app" << std::endl;
+	std::cout << "App version: " << version << "\n" << std::endl;
 	SetConsoleCtrlHandler((PHANDLER_ROUTINE)(ctrl_handler), TRUE);
+	handleFileConfigurations(); //load configs from settings.ini
+	std::thread updateThread([] {
+		if (checkForUpdateFF) {
+			std::cout << "Checking for updates..." << std::endl;
+			checkForAnUpdate();
+		}
+	});
+		
+	
 	CorsairPerformProtocolHandshake();
 	if (const auto error = CorsairGetLastError()) {
 		std::cout << "Handshake failed: " << toString(error) << "\n" << std::endl;
@@ -293,10 +451,7 @@ int main()
 		return 1;
 	}
 
-	std::cout << "Using default refresh interval: " << sleepDuration.load() << " milliseconds" << std::endl;
-	std::cout << "Multi-monitor mode is ON\n" << std::endl;
-	std::cout << "Running..." << std::endl;
-	printOptions();
+	std::cout << "Running..." << "\n" << std::endl;
 	
 	std::thread lightingThread([&colorsVector] {
 		while (continueExecution) {
@@ -309,6 +464,7 @@ int main()
 	handleConfigurations();
 
 	lightingThread.join();
+	updateThread.join();
 
 	return 0;
 }
