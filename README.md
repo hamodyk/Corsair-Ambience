@@ -47,7 +47,7 @@ Notes:
 
 # Road Map
 - Create a GUI
-- Add more configurations (such as sleep time, number of pixels to sample etc...)
+- Add more configurations (such as sleep time, number of pixels to sample etc...) - *done*
 - Add more coloring options (such as most dominant color, elimination of dark colors etc...)
 - Make it an installable app
 - Add option to start the app on Windows start up
