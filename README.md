@@ -78,7 +78,7 @@ A: Yes
 - [SimpleINI](https://github.com/brofield/simpleini) - for the parsing the settings file
 
 # Donations
-If you enjoy this application and would like to support its development: 
+If you enjoy this application and would like to support its development, here's my: 
 
 - Paypal: https://www.paypal.me/cytrixghost
 - Steam: https://steamcommunity.com/tradeoffer/new/?partner=63409948&token=qKZ6lsHT 
