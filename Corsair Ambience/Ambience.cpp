@@ -13,40 +13,83 @@
 #include <windows.h>
 #include <cstdlib>
 #include <unordered_set>
+#include <unordered_map>
 #include <SimpleIni.h>
 #include <nlohmann/json.hpp>
+#include <set>
+#include <math.h>
 
-#define version "v1.3"
+#define version "v1.4"
 #define settingsFileName "settings.ini"
 
 using json = nlohmann::json;
 
-struct RGB { int red; int green; int blue; };
+struct RGB { short red; short green; short blue; };
+struct Zone { int zoneX; int zoneY; };
+
 int ScreenX = 0;
 int ScreenY = 0;
 int stepX = 5;
 int stepY = 5;
-BYTE* ScreenData = 0;
-CSimpleIniA ini;
-
+const short horizontalZones = 17;
+const short verticalZones = 6;
 
 std::atomic_bool continueExecution{ true };
 std::atomic_bool multiMonitorSupport{ true };
 std::atomic_int sleepDuration{ 500 };
 bool checkForUpdateFF = true;
+bool keyboardZoneColoring = true;
+bool mousePadZoneColoring = true;
+bool filterBadColors = true;
 
-void ScreenCap()
-{
-	HDC hScreen = GetDC(GetDesktopWindow());
+BYTE* ScreenData = 0;
+CSimpleIniA ini;
+
+struct postitionComparator {
+	bool operator() (const CorsairLedPosition& led1, const CorsairLedPosition& led2) const{
+		if (led1.left < led2.left) {
+			return true;
+		}
+		else if (led1.left == led2.left && led1.top < led2.top) {
+			return true;
+		}
+		return false;
+	}
+};
+
+struct zoneComparator {
+	bool operator() (const Zone& zone1, const Zone& zone2) const {
+		if (zone1.zoneX < zone2.zoneX) {
+			return true;
+		}
+		else if (zone1.zoneX == zone2.zoneX && zone1.zoneY < zone2.zoneY) {
+			return true;
+		}
+		return false;
+	}
+};
+
+std::unordered_map<CorsairDeviceType, std::map<CorsairLedPosition, Zone, postitionComparator>> deviceLedsToZonesMap;
+std::unordered_map<CorsairDeviceType, std::set<CorsairLedPosition, postitionComparator>> deviceToLedPositionsMap;
+std::map<CorsairLedPosition, Zone, postitionComparator> ledPosToZoneMap;
+std::map<Zone, RGB, zoneComparator> zoneToRGBmap;
+
+
+
+
+void setScreenSize() {
 	if (multiMonitorSupport.load()) {
 		ScreenX = GetSystemMetrics(SM_CXVIRTUALSCREEN);
 		ScreenY = GetSystemMetrics(SM_CYVIRTUALSCREEN);
 	}
 	else {
-		ScreenX = GetDeviceCaps(hScreen, HORZRES);
-		ScreenY = GetDeviceCaps(hScreen, VERTRES);
+		ScreenX = GetSystemMetrics(SM_CXSCREEN);
+		ScreenY = GetSystemMetrics(SM_CYSCREEN);
 	}
+}
 
+void ScreenCap(){
+	HDC hScreen = GetDC(GetDesktopWindow());
 	HDC hdcMem = CreateCompatibleDC(hScreen);
 	HBITMAP hBitmap = CreateCompatibleBitmap(hScreen, ScreenX, ScreenY);
 	HGDIOBJ hOld = SelectObject(hdcMem, hBitmap);
@@ -90,27 +133,29 @@ inline int PosR(int x, int y)
 	return ScreenData[4 * ((y*ScreenX) + x) + 2];
 }
 
-RGB getPixelAvg()
-{
-	int sumRed = 0;
-	int sumGreen = 0;
-	int sumBlue = 0;
+RGB getPixelAvg(unsigned int xStart, unsigned int yStart, unsigned int xEnd, unsigned int yEnd){
+	unsigned long sumRed = 0;
+	unsigned long sumGreen = 0;
+	unsigned long sumBlue = 0;
+	unsigned long totalZonePixels = 0;
+	unsigned long numOfSkippedPixels = 0;
+	const short lowColorDiff = 25;
 
-	int numOfSkippedPixels = 0;
-	const int lowColorDiff = 25;
-
-	for (int x = 0; x < ScreenX; x = x + stepX) {
-		for (int y = 0; y < ScreenY; y = y + stepY) {
+	for (unsigned int x = xStart; x < xEnd; x = x + stepX) {
+		for (unsigned int y = yStart; y < yEnd; y = y + stepY) {
+			totalZonePixels++;
 			int pixelRed = PosR(x, y);
 			int pixelGreen = PosG(x, y);
 			int pixelBlue= PosB(x, y);
-			if (pixelRed + pixelGreen + pixelBlue < 50 || pixelRed + pixelGreen + pixelBlue > 254*3) { 
-				numOfSkippedPixels++;
-				continue; //ignore extremely dark/bright colors as they just ruin the average
-			}
-			else if (abs(pixelRed - pixelGreen) <= lowColorDiff && abs(pixelRed - pixelBlue) <= lowColorDiff && abs(pixelGreen - pixelBlue) <= lowColorDiff) {
-				numOfSkippedPixels++;
-				continue; //I noticed that when the difference between R, G and B is less than a small number (say 25) then the color is "dark", thus it's better to skip it
+			if (filterBadColors) {
+				if (pixelRed + pixelGreen + pixelBlue < 50 || pixelRed + pixelGreen + pixelBlue > 254 * 3) {
+					numOfSkippedPixels++;
+					continue; //ignore extremely dark/bright colors as they just ruin the average
+				}
+				else if (abs(pixelRed - pixelGreen) <= lowColorDiff && abs(pixelRed - pixelBlue) <= lowColorDiff && abs(pixelGreen - pixelBlue) <= lowColorDiff) {
+					numOfSkippedPixels++;
+					continue; //I noticed that when the difference between R, G and B is less than a small number (say 25) then the color is "dark", thus it's better to skip it
+				}
 			}
 			sumRed = sumRed + pixelRed;
 			sumGreen = sumGreen + pixelGreen;
@@ -118,20 +163,19 @@ RGB getPixelAvg()
 		}
 	}
 	
-	const int totalScreenPixels = (ScreenX / stepX) * (ScreenY / stepY);
-	int totalFilteredPixels;
-	if (numOfSkippedPixels >= totalScreenPixels) {
-		totalFilteredPixels = totalScreenPixels; //to avoid cases such as division by zero or by a negative number, we should just ignore the skipped pixels
+	unsigned long totalFilteredPixels;
+	if (numOfSkippedPixels >= totalZonePixels) {
+		totalFilteredPixels = totalZonePixels; //to avoid cases such as division by zero or by a negative number, we should just ignore the skipped pixels
 	}
 	else {
-		totalFilteredPixels = totalScreenPixels - numOfSkippedPixels;
+		totalFilteredPixels = totalZonePixels - numOfSkippedPixels;
 	}
 
 	RGB avgRgb;
 	avgRgb.red = sumRed / totalFilteredPixels;
 	avgRgb.green = sumGreen / totalFilteredPixels;
 	avgRgb.blue = sumBlue / totalFilteredPixels;
-
+	
 	return avgRgb;
 }
 
@@ -156,9 +200,12 @@ const char* toString(CorsairError error){
 	}
 }
 
+
+
 std::vector<CorsairLedColor> getAvailableKeys(){
 	auto colorsSet = std::unordered_set<CorsairLedId>();
-	for (int deviceIndex = 0, size = CorsairGetDeviceCount(); deviceIndex < size; deviceIndex++) {
+	for (short deviceIndex = 0, size = CorsairGetDeviceCount(); deviceIndex < size; deviceIndex++) {
+		std::set<CorsairLedPosition, postitionComparator> sortedLedPositionsSet;
 		if (const auto deviceInfo = CorsairGetDeviceInfo(deviceIndex)) {
 			switch (deviceInfo->type) {
 			case CDT_Mouse: {
@@ -174,8 +221,32 @@ std::vector<CorsairLedColor> getAvailableKeys(){
 				colorsSet.insert(CLH_LeftLogo);
 				colorsSet.insert(CLH_RightLogo);
 			} break;
-			case CDT_Keyboard:
-			case CDT_MouseMat:
+			case CDT_Keyboard: {
+				if (keyboardZoneColoring) {
+					const auto ledPositions = CorsairGetLedPositionsByDeviceIndex(deviceIndex);
+					if (ledPositions) {
+						for (auto i = 0; i < ledPositions->numberOfLed; i++) {
+							const auto ledPos = ledPositions->pLedPosition[i];
+							sortedLedPositionsSet.insert(ledPos);
+						}
+						deviceToLedPositionsMap[deviceInfo->type] = sortedLedPositionsSet;
+					}
+					break;
+				}
+			}
+			case CDT_MouseMat: {
+				if (mousePadZoneColoring) {
+					const auto ledPositions = CorsairGetLedPositionsByDeviceIndex(deviceIndex);
+					if (ledPositions) {
+						for (auto i = 0; i < ledPositions->numberOfLed; i++) {
+							const auto ledPos = ledPositions->pLedPosition[i];
+							sortedLedPositionsSet.insert(ledPos);
+						}
+						deviceToLedPositionsMap[deviceInfo->type] = sortedLedPositionsSet;
+					}
+					break;
+				}
+			}
 			case CDT_HeadsetStand:
 			case CDT_CommanderPro:
 			case CDT_LightingNodePro:
@@ -202,6 +273,115 @@ std::vector<CorsairLedColor> getAvailableKeys(){
 	}
 	return colorsVector;
 }
+
+
+std::set<int> resizeSet(std::set<int> someSet, int desiredSize) {
+	std::set<int>::iterator it = someSet.begin();
+	const int setSize = someSet.size();
+	int counter = 0;
+	while (it != someSet.end()) {
+		std::set<int>::iterator current = it++;
+		double div = static_cast<double>(setSize) / desiredSize;
+		if (counter % (static_cast<int>(ceil(div))) != 0) {
+			someSet.erase(current);
+		}
+		counter++;
+	}
+	return someSet;
+}
+
+
+void avgColorByZone(const short horizontalZones, const short verticalZones) {
+	for (int horizontalZoneId = 0; horizontalZoneId < horizontalZones; horizontalZoneId++) {
+		for (int verticalZoneId = 0; verticalZoneId < verticalZones; verticalZoneId++) {
+			unsigned int xStart = horizontalZoneId * (ScreenX / horizontalZones);
+			unsigned int yStart = verticalZoneId * (ScreenY / verticalZones);
+			unsigned int xEnd = (horizontalZoneId + 1) * (ScreenX / horizontalZones);
+			unsigned int yEnd = (verticalZoneId + 1) * (ScreenY / verticalZones);
+			RGB avgRgbPerZone = getPixelAvg(xStart, yStart, xEnd, yEnd);
+			Zone zone = {horizontalZoneId, verticalZoneId};
+			zoneToRGBmap[zone] = { avgRgbPerZone.red, avgRgbPerZone.green, avgRgbPerZone.blue};
+		}
+	}
+}
+
+
+void mapLedsToZones() {
+	for (auto& device : deviceToLedPositionsMap) {
+		auto currentDevice = device.first;
+		switch (currentDevice) {
+		case CDT_MouseMat:
+		case CDT_Keyboard: {
+			std::set<int> leftValuesSet;
+			std::set<int> topValuesSet;
+			for (auto& ledPos : deviceToLedPositionsMap[currentDevice]) {
+				if (leftValuesSet.find(ledPos.left) == leftValuesSet.end()) {
+					leftValuesSet.insert(ledPos.left);
+				}
+				if (topValuesSet.find(ledPos.top) == topValuesSet.end()) {
+					topValuesSet.insert(ledPos.top);
+				}
+			}
+
+
+			leftValuesSet = resizeSet(leftValuesSet, horizontalZones);
+			topValuesSet = resizeSet(topValuesSet, verticalZones);
+
+			for (auto& ledPos : deviceToLedPositionsMap[currentDevice]) {
+				std::set<int>::iterator leftIterator = leftValuesSet.begin();
+				int counterX = 0;
+				while (leftIterator != leftValuesSet.end()) {
+					std::set<int>::iterator current = leftIterator++;
+					if (*current >= ledPos.left) {
+						break;
+					}
+					counterX++;
+				}
+
+				std::set<int>::iterator topIterator = topValuesSet.begin();
+				int counterY = 0;
+				while (topIterator != topValuesSet.end()) {
+					std::set<int>::iterator current = topIterator++;
+					if (*current >= ledPos.top) {
+						break;
+					}
+					counterY++;
+				}
+				ledPosToZoneMap[ledPos] = { counterX , counterY };
+			}
+			deviceLedsToZonesMap[currentDevice] = ledPosToZoneMap;
+		} break;
+		default:
+			break;
+		}
+	}
+}
+
+
+void zoneColoring() {
+	avgColorByZone(horizontalZones, verticalZones);
+	for (auto& device : deviceLedsToZonesMap) {
+		auto currentDevice = device.first;
+		switch (currentDevice) {
+		case CDT_MouseMat:
+		case CDT_Keyboard: {
+			std::map<CorsairLedPosition, Zone, postitionComparator> ledsZonesMap = deviceLedsToZonesMap[currentDevice];
+			std::vector<CorsairLedColor> colorsVector;
+			colorsVector.reserve(ledsZonesMap.size());
+			for (auto& ledPosIter : ledsZonesMap) {
+				CorsairLedPosition ledPos = ledPosIter.first;
+				Zone currentZone = ledsZonesMap[ledPos];
+				RGB avgZoneRGB = zoneToRGBmap[currentZone];
+				colorsVector.push_back({ ledPos.ledId, avgZoneRGB.red, avgZoneRGB.green, avgZoneRGB.blue });
+			}
+			CorsairSetLedsColorsAsync(static_cast<int>(colorsVector.size()), colorsVector.data(), nullptr, nullptr);
+		} break;
+		default:
+			break;
+		}
+	}
+}
+
 
 void setLedsColor(RGB avgRgb, std::vector<CorsairLedColor> &ledColorsVec) {
 	for (auto &ledColor : ledColorsVec) {
@@ -251,9 +431,11 @@ void printLoadedSettings() {
 	std::cout << "Horizontal Step: " << stepX << std::endl;
 	std::cout << "Vertical Step: " << stepY << std::endl;
 	std::cout << "Check for an update on start up is " << (checkForUpdateFF ? "ON" : "OFF") << std::endl;
-	std::cout << "Multi-monitor mode is " << (multiMonitorSupport ? "ON" : "OFF") << "\n" << std::endl;
+	std::cout << "Multi-monitor mode is " << (multiMonitorSupport ? "ON" : "OFF") << std::endl;
+	std::cout << "Keyboard zone coloring is " << (keyboardZoneColoring ? "ON" : "OFF") << std::endl;
+	std::cout << "Mousepad zone coloring is " << (mousePadZoneColoring ? "ON" : "OFF") << std::endl;
+	std::cout << "Filter bad colors is " << (filterBadColors ? "ON" : "OFF") << "\n" << std::endl;
 }
-
 
 int getConfigValAsInt(const char* section, const char* key, int defaultVal, int rangeLowerBound, int rangeUpperBound) {
 	int res;
@@ -281,21 +463,21 @@ void handleFileConfigurations() {
 		return;
 	}
 
-	sleepDuration = getConfigValAsInt("CONFIGS", "refreshInterval", sleepDuration, 15, 1000);
+	sleepDuration = getConfigValAsInt("CONFIGS", "RefreshInterval", sleepDuration, 15, 1000);
 
-	stepX = getConfigValAsInt("CONFIGS", "horizontalStep", stepX, 1, 32);
-	stepY = getConfigValAsInt("CONFIGS", "verticalStep", stepY, 1, 32);
+	stepX = getConfigValAsInt("CONFIGS", "HorizontalStep", stepX, 1, 32);
+	stepY = getConfigValAsInt("CONFIGS", "VerticalStep", stepY, 1, 32);
 
-	multiMonitorSupport = stringToBool(ini.GetValue("CONFIGS", "multiMonitorSupport"));
-	checkForUpdateFF = stringToBool(ini.GetValue("CONFIGS", "checkForUpdateOnStartup"));
+	multiMonitorSupport = stringToBool(ini.GetValue("CONFIGS", "MultiMonitorSupport"));
+	checkForUpdateFF = stringToBool(ini.GetValue("CONFIGS", "CheckForUpdateOnStartup"));
+	keyboardZoneColoring = stringToBool(ini.GetValue("CONFIGS", "KeyboardZoneColoring"));
+	mousePadZoneColoring = stringToBool(ini.GetValue("CONFIGS", "MousePadZoneColoring"));
+	filterBadColors = stringToBool(ini.GetValue("CONFIGS", "FilterBadColors"));
 }
 
 void handleConfigurations() {
-
 	printLoadedSettings();
-
 	printOptions();
-
 	while (continueExecution) {
 		char c = getchar();
 		switch (c) {
@@ -320,10 +502,12 @@ void handleConfigurations() {
 			case '1':
 				multiMonitorSupport = false;
 				std::cout << "Multi-monitor support is OFF. Using only the primary monitor to calculate the average.\n" << std::endl;
+				setScreenSize();
 				break;
 			case '2':
 				multiMonitorSupport = true;
 				std::cout << "Multi-monitor support is ON. Using all monitors to calculate the average.\n" << std::endl;
+				setScreenSize();
 				break;
 			case 'o':
 			case 'O':
@@ -428,12 +612,12 @@ void checkForAnUpdate() {
 }
 
 
-int main()
-{
+int main(){
 	std::cout << "Starting app" << std::endl;
 	std::cout << "App version: " << version << "\n" << std::endl;
 	SetConsoleCtrlHandler((PHANDLER_ROUTINE)(ctrl_handler), TRUE);
 	handleFileConfigurations(); //load configs from settings.ini
+	setScreenSize();
 	std::thread updateThread([] {
 		if (checkForUpdateFF) {
 			std::cout << "Checking for updates..." << std::endl;
@@ -452,6 +636,8 @@ int main()
 		getchar();
 		return -1;
 	}
+	CorsairRequestControl(CAM_ExclusiveLightingControl);
+	//CorsairSetLayerPriority(129);
 
 	auto colorsVector = getAvailableKeys();
 	std::cout << "Available LED keys: " << colorsVector.size() << std::endl;
@@ -462,11 +648,14 @@ int main()
 	}
 
 	std::cout << "Running..." << "\n" << std::endl;
-	
+	mapLedsToZones();
 	std::thread lightingThread([&colorsVector] {
 		while (continueExecution) {
 			ScreenCap();
-			setLedsColor(getPixelAvg(), colorsVector);
+			setLedsColor(getPixelAvg(0, 0, ScreenX, ScreenY), colorsVector);
+			if (keyboardZoneColoring || mousePadZoneColoring) {
+				zoneColoring();
+			}
 			std::this_thread::sleep_for(std::chrono::milliseconds(sleepDuration.load()));
 		}
 	});
