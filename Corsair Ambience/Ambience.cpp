@@ -19,7 +19,7 @@
 #include <set>
 #include <math.h>
 
-#define version "v1.4"
+#define version "v2.0"
 #define settingsFileName "settings.ini"
 
 using json = nlohmann::json;
@@ -31,8 +31,8 @@ int ScreenX = 0;
 int ScreenY = 0;
 int stepX = 5;
 int stepY = 5;
-const short horizontalZones = 17;
-const short verticalZones = 6;
+int horizontalZones = 17;
+int verticalZones = 6;
 
 std::atomic_bool continueExecution{ true };
 std::atomic_bool multiMonitorSupport{ true };
@@ -200,12 +200,22 @@ const char* toString(CorsairError error){
 	}
 }
 
+void mapDeviceToSortedLeds(short deviceIndex, CorsairDeviceInfo *deviceInfo) {
+	std::set<CorsairLedPosition, postitionComparator> sortedLedPositionsSet;
+	const auto ledPositions = CorsairGetLedPositionsByDeviceIndex(deviceIndex);
+	if (ledPositions) {
+		for (auto i = 0; i < ledPositions->numberOfLed; i++) {
+			const auto ledPos = ledPositions->pLedPosition[i];
+			sortedLedPositionsSet.insert(ledPos);
+		}
+		deviceToLedPositionsMap[deviceInfo->type] = sortedLedPositionsSet;
+	}
+}
 
 
 std::vector<CorsairLedColor> getAvailableKeys(){
 	auto colorsSet = std::unordered_set<CorsairLedId>();
 	for (short deviceIndex = 0, size = CorsairGetDeviceCount(); deviceIndex < size; deviceIndex++) {
-		std::set<CorsairLedPosition, postitionComparator> sortedLedPositionsSet;
 		if (const auto deviceInfo = CorsairGetDeviceInfo(deviceIndex)) {
 			switch (deviceInfo->type) {
 			case CDT_Mouse: {
@@ -223,27 +233,13 @@ std::vector<CorsairLedColor> getAvailableKeys(){
 			} break;
 			case CDT_Keyboard: {
 				if (keyboardZoneColoring) {
-					const auto ledPositions = CorsairGetLedPositionsByDeviceIndex(deviceIndex);
-					if (ledPositions) {
-						for (auto i = 0; i < ledPositions->numberOfLed; i++) {
-							const auto ledPos = ledPositions->pLedPosition[i];
-							sortedLedPositionsSet.insert(ledPos);
-						}
-						deviceToLedPositionsMap[deviceInfo->type] = sortedLedPositionsSet;
-					}
+					mapDeviceToSortedLeds(deviceIndex, deviceInfo);
 					break;
 				}
 			}
 			case CDT_MouseMat: {
 				if (mousePadZoneColoring) {
-					const auto ledPositions = CorsairGetLedPositionsByDeviceIndex(deviceIndex);
-					if (ledPositions) {
-						for (auto i = 0; i < ledPositions->numberOfLed; i++) {
-							const auto ledPos = ledPositions->pLedPosition[i];
-							sortedLedPositionsSet.insert(ledPos);
-						}
-						deviceToLedPositionsMap[deviceInfo->type] = sortedLedPositionsSet;
-					}
+					mapDeviceToSortedLeds(deviceIndex, deviceInfo);
 					break;
 				}
 			}
@@ -291,7 +287,7 @@ std::set<int> resizeSet(std::set<int> someSet, int desiredSize) {
 }
 
 
-void avgColorByZone(const short horizontalZones, const short verticalZones) {
+void avgColorByZone(int horizontalZones, int verticalZones) {
 	for (int horizontalZoneId = 0; horizontalZoneId < horizontalZones; horizontalZoneId++) {
 		for (int verticalZoneId = 0; verticalZoneId < verticalZones; verticalZoneId++) {
 			unsigned int xStart = horizontalZoneId * (ScreenX / horizontalZones);
@@ -413,6 +409,8 @@ void printOptions() {
 	options = options + "1 : single monitor mode (disable multi-monitor support - less CPU usage)" + "\n";
 	options = options + "2 : multi-monitor mode" + "\n";
 	options = options + "o : print the options" + "\n";
+	options = options + "s : print the loaded settings" + "\n";
+	options = options + "r : reload the settings file (works when files are extracted)" + "\n";
 	options = options + "q : quit the app\n" + "\n";
 	std::cout << options << std::endl;
 }
@@ -430,6 +428,8 @@ void printLoadedSettings() {
 	std::cout << "Refresh interval: " << sleepDuration.load() << " milliseconds" << std::endl;
 	std::cout << "Horizontal Step: " << stepX << std::endl;
 	std::cout << "Vertical Step: " << stepY << std::endl;
+	std::cout << "Horizontal Zones: " << horizontalZones << std::endl;
+	std::cout << "Vertical Zones: " << verticalZones << std::endl;
 	std::cout << "Check for an update on start up is " << (checkForUpdateFF ? "ON" : "OFF") << std::endl;
 	std::cout << "Multi-monitor mode is " << (multiMonitorSupport ? "ON" : "OFF") << std::endl;
 	std::cout << "Keyboard zone coloring is " << (keyboardZoneColoring ? "ON" : "OFF") << std::endl;
@@ -455,7 +455,7 @@ int getConfigValAsInt(const char* section, const char* key, int defaultVal, int 
 	return res;
 }
 
-void handleFileConfigurations() {
+void loadConfigsFromSettingsFile() {
 	ini.SetUnicode();
 	int rc = ini.LoadFile(settingsFileName);
 	if (rc < 0) {
@@ -467,6 +467,8 @@ void handleFileConfigurations() {
 
 	stepX = getConfigValAsInt("CONFIGS", "HorizontalStep", stepX, 1, 32);
 	stepY = getConfigValAsInt("CONFIGS", "VerticalStep", stepY, 1, 32);
+	horizontalZones = getConfigValAsInt("CONFIGS", "HorizontalZones", horizontalZones, 1, 25);
+	verticalZones = getConfigValAsInt("CONFIGS", "VerticalZones", verticalZones, 1, 25);
 
 	multiMonitorSupport = stringToBool(ini.GetValue("CONFIGS", "MultiMonitorSupport"));
 	checkForUpdateFF = stringToBool(ini.GetValue("CONFIGS", "CheckForUpdateOnStartup"));
@@ -476,7 +478,7 @@ void handleFileConfigurations() {
 }
 
 void handleConfigurations() {
-	printLoadedSettings();
+	//printLoadedSettings();
 	printOptions();
 	while (continueExecution) {
 		char c = getchar();
@@ -513,9 +515,18 @@ void handleConfigurations() {
 			case 'O':
 				printOptions();
 				break;
+			case 's':
+			case 'S':
+				printLoadedSettings();
+				break;
 			case 'Q':
 			case 'q':
 				continueExecution = false;
+				break;
+			case 'r':
+			case 'R':
+				loadConfigsFromSettingsFile();
+				printLoadedSettings();
 				break;
 			default:
 				break;
@@ -616,7 +627,7 @@ int main(){
 	std::cout << "Starting app" << std::endl;
 	std::cout << "App version: " << version << "\n" << std::endl;
 	SetConsoleCtrlHandler((PHANDLER_ROUTINE)(ctrl_handler), TRUE);
-	handleFileConfigurations(); //load configs from settings.ini
+	loadConfigsFromSettingsFile(); //load configs from settings.ini
 	setScreenSize();
 	std::thread updateThread([] {
 		if (checkForUpdateFF) {
@@ -641,7 +652,7 @@ int main(){
 
 	auto colorsVector = getAvailableKeys();
 	std::cout << "Available LED keys: " << colorsVector.size() << std::endl;
-	if (colorsVector.empty()) {
+	if (colorsVector.empty() && !keyboardZoneColoring && !mousePadZoneColoring) {
 		std::cout << "No LED keys available" << "\nPress any key to quit." << std::endl;
 		getchar();
 		return 1;
