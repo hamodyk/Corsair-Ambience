@@ -18,8 +18,9 @@
 #include <nlohmann/json.hpp>
 #include <set>
 #include <math.h>
+#include "DXGIManager.h"
 
-#define version "v2.0"
+#define version "v2.1"
 #define settingsFileName "settings.ini"
 
 using json = nlohmann::json;
@@ -41,6 +42,7 @@ bool checkForUpdateFF = true;
 bool keyboardZoneColoring = true;
 bool mousePadZoneColoring = true;
 bool filterBadColors = true;
+bool DXGI = true;
 
 BYTE* ScreenData = 0;
 CSimpleIniA ini;
@@ -73,7 +75,40 @@ std::unordered_map<CorsairDeviceType, std::map<CorsairLedPosition, Zone, postiti
 std::unordered_map<CorsairDeviceType, std::set<CorsairLedPosition, postitionComparator>> deviceToLedPositionsMap;
 std::map<CorsairLedPosition, Zone, postitionComparator> ledPosToZoneMap;
 std::map<Zone, RGB, zoneComparator> zoneToRGBmap;
+DXGIManager g_DXGIManager;
+RECT rcDim;
+BYTE* pBuf;
 
+BYTE* DXGIScreepCap() {
+	//CoInitialize(NULL);
+	g_DXGIManager.GetOutputRect(rcDim);
+
+	DWORD dwWidth = rcDim.right - rcDim.left;
+	DWORD dwHeight = rcDim.bottom - rcDim.top;
+
+	//printf("dwWidth=%d dwHeight=%d\n", dwWidth, dwHeight);
+
+	DWORD dwBufSize = dwWidth * dwHeight * 4;
+	/*
+	if (pBuf) {
+		free(pBuf);
+	}
+	pBuf = new BYTE[dwBufSize];*/
+	HRESULT hr;
+
+	int i = 0;
+	do{
+		hr = g_DXGIManager.GetOutputBits(pBuf, rcDim);
+		i++;
+	} while (hr == DXGI_ERROR_WAIT_TIMEOUT && i < 2);
+
+	if (FAILED(hr)){
+		//printf("GetOutputBits failed with hr=0x%08x\n", hr);
+		return NULL;
+	}
+
+	return pBuf;
+}
 
 
 
@@ -148,7 +183,8 @@ RGB getPixelAvg(unsigned int xStart, unsigned int yStart, unsigned int xEnd, uns
 			int pixelGreen = PosG(x, y);
 			int pixelBlue= PosB(x, y);
 			if (filterBadColors) {
-				if (pixelRed + pixelGreen + pixelBlue < 50 || pixelRed + pixelGreen + pixelBlue > 254 * 3) {
+				short rgbSum = pixelRed + pixelGreen + pixelBlue;
+				if (rgbSum < 50 || rgbSum > 254 * 3) {
 					numOfSkippedPixels++;
 					continue; //ignore extremely dark/bright colors as they just ruin the average
 				}
@@ -238,7 +274,7 @@ std::vector<CorsairLedColor> getAvailableKeys(){
 				}
 			}
 			case CDT_MouseMat: {
-				if (mousePadZoneColoring) {
+				if (mousePadZoneColoring && deviceInfo->type != CDT_Keyboard) {
 					mapDeviceToSortedLeds(deviceIndex, deviceInfo);
 					break;
 				}
@@ -411,6 +447,7 @@ void printOptions() {
 	options = options + "o : print the options" + "\n";
 	options = options + "s : print the loaded settings" + "\n";
 	options = options + "r : reload the settings file (works when files are extracted)" + "\n";
+	options = options + "a : switch API (choices: DXGI, DGI)" + "\n";
 	options = options + "q : quit the app\n" + "\n";
 	std::cout << options << std::endl;
 }
@@ -475,9 +512,19 @@ void loadConfigsFromSettingsFile() {
 	keyboardZoneColoring = stringToBool(ini.GetValue("CONFIGS", "KeyboardZoneColoring"));
 	mousePadZoneColoring = stringToBool(ini.GetValue("CONFIGS", "MousePadZoneColoring"));
 	filterBadColors = stringToBool(ini.GetValue("CONFIGS", "FilterBadColors"));
+	DXGI = stringToBool(ini.GetValue("CONFIGS", "DXGI_API"));
 }
 
+void initDXGI() {
+	CoInitialize(NULL);
+	g_DXGIManager.SetCaptureSource(CSDesktop);
+	g_DXGIManager.Init();
+	pBuf = new BYTE[ScreenX * ScreenY * 4];
+}
+
+
 void handleConfigurations() {
+	std::string api;
 	//printLoadedSettings();
 	printOptions();
 	while (continueExecution) {
@@ -505,11 +552,13 @@ void handleConfigurations() {
 				multiMonitorSupport = false;
 				std::cout << "Multi-monitor support is OFF. Using only the primary monitor to calculate the average.\n" << std::endl;
 				setScreenSize();
+				pBuf = new BYTE[ScreenX * ScreenY * 4];
 				break;
 			case '2':
 				multiMonitorSupport = true;
 				std::cout << "Multi-monitor support is ON. Using all monitors to calculate the average.\n" << std::endl;
 				setScreenSize();
+				pBuf = new BYTE[ScreenX * ScreenY * 4];
 				break;
 			case 'o':
 			case 'O':
@@ -527,6 +576,18 @@ void handleConfigurations() {
 			case 'R':
 				loadConfigsFromSettingsFile();
 				printLoadedSettings();
+				break;
+			case 'a':
+			case 'A':
+				DXGI = !DXGI;
+				api = DXGI ? "DXGI" : "GDI";
+				std::cout << "Using " << api << " API to capture the screen." << std::endl;
+				if (DXGI) {
+					initDXGI();
+				}
+				else {
+					std::cout << "Please note that DXGI is much faster than GDI." << std::endl;
+				}
 				break;
 			default:
 				break;
@@ -635,7 +696,10 @@ int main(){
 			checkForAnUpdate();
 		}
 	});
-		
+
+	if (DXGI) {
+		initDXGI();
+	}
 	
 	CorsairPerformProtocolHandshake();
 	if (const auto error = CorsairGetLastError()) {
@@ -662,7 +726,15 @@ int main(){
 	mapLedsToZones();
 	std::thread lightingThread([&colorsVector] {
 		while (continueExecution) {
-			ScreenCap();
+			if (DXGI) {
+				ScreenData = DXGIScreepCap();
+				if (ScreenData == NULL) {
+					continue;
+				}
+			}
+			else {
+				ScreenCap();
+			}
 			setLedsColor(getPixelAvg(0, 0, ScreenX, ScreenY), colorsVector);
 			if (keyboardZoneColoring || mousePadZoneColoring) {
 				zoneColoring();
