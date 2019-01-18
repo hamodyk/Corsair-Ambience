@@ -68,20 +68,24 @@ public:
 	~DXGIManager();
 	HRESULT SetCaptureSource(CaptureSource type);
 	CaptureSource GetCaptureSource();
+	void SetCaptureSourceByIndex(int index);
+	int GetCaptureSourceIndex();
 
 	HRESULT GetOutputRect(RECT& rc);
 	HRESULT GetOutputBits(BYTE* pBits, RECT& rcDest);
 	HRESULT Init();
-private:
-
 	int GetMonitorCount();
+
+private:
 	vector<DXGIOutputDuplication> GetOutputDuplication();
-	void DrawMousePointer(BYTE* pDesktopBits, RECT rcDesktop, RECT rcDest);
+	vector<DXGIOutputDuplication> GetOutputDuplicationByIndex(int index);
+	
 private:
 	CComPtr<IDXGIFactory1> m_spDXGIFactory1;
 	vector<DXGIOutputDuplication> m_vOutputs;
 	bool m_bInitialized;
 	CaptureSource m_CaptureSource;
+	int m_CaptureSourceByIndex;
 	RECT m_rcCurrentOutput;
 	BYTE* m_pBuf;
 

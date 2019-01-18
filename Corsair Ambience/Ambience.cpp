@@ -34,6 +34,7 @@ int stepX = 5;
 int stepY = 5;
 int horizontalZones = 17;
 int verticalZones = 6;
+int pinToMonitor = -1;
 
 std::atomic_bool continueExecution{ true };
 std::atomic_bool multiMonitorSupport{ true };
@@ -43,6 +44,7 @@ bool keyboardZoneColoring = true;
 bool mousePadZoneColoring = true;
 bool filterBadColors = true;
 bool DXGI = true;
+bool screenSizeChanged = false;
 
 BYTE* ScreenData = 0;
 CSimpleIniA ini;
@@ -77,42 +79,37 @@ std::map<CorsairLedPosition, Zone, postitionComparator> ledPosToZoneMap;
 std::map<Zone, RGB, zoneComparator> zoneToRGBmap;
 DXGIManager g_DXGIManager;
 RECT rcDim;
-BYTE* pBuf;
 
-BYTE* DXGIScreepCap() {
-	//CoInitialize(NULL);
+void DXGIScreepCap() {
 	g_DXGIManager.GetOutputRect(rcDim);
-
 	DWORD dwWidth = rcDim.right - rcDim.left;
 	DWORD dwHeight = rcDim.bottom - rcDim.top;
-
-	//printf("dwWidth=%d dwHeight=%d\n", dwWidth, dwHeight);
-
 	DWORD dwBufSize = dwWidth * dwHeight * 4;
-	/*
-	if (pBuf) {
-		free(pBuf);
+	if (screenSizeChanged) {
+		if (ScreenData) {
+			free(ScreenData);
+		}
+		ScreenData = (BYTE*)malloc(dwBufSize);
+		screenSizeChanged = false;
 	}
-	pBuf = new BYTE[dwBufSize];*/
+
 	HRESULT hr;
 
 	int i = 0;
 	do{
-		hr = g_DXGIManager.GetOutputBits(pBuf, rcDim);
+		hr = g_DXGIManager.GetOutputBits(ScreenData, rcDim);
 		i++;
 	} while (hr == DXGI_ERROR_WAIT_TIMEOUT && i < 2);
-
-	if (FAILED(hr)){
-		//printf("GetOutputBits failed with hr=0x%08x\n", hr);
-		return NULL;
-	}
-
-	return pBuf;
+	/*
+	if (FAILED(hr) || hr == DXGI_ERROR_WAIT_TIMEOUT){
+		ScreenData = NULL;
+	}*/
 }
 
 
 
 void setScreenSize() {
+	screenSizeChanged = true;
 	if (multiMonitorSupport.load()) {
 		ScreenX = GetSystemMetrics(SM_CXVIRTUALSCREEN);
 		ScreenY = GetSystemMetrics(SM_CYVIRTUALSCREEN);
@@ -123,7 +120,7 @@ void setScreenSize() {
 	}
 }
 
-void ScreenCap(){
+void GDIScreenCap(){
 	HDC hScreen = GetDC(GetDesktopWindow());
 	HDC hdcMem = CreateCompatibleDC(hScreen);
 	HBITMAP hBitmap = CreateCompatibleBitmap(hScreen, ScreenX, ScreenY);
@@ -140,9 +137,12 @@ void ScreenCap(){
 	bmi.biCompression = BI_RGB;
 	bmi.biSizeImage = 0;// 3 * ScreenX * ScreenY;
 
-	if (ScreenData)
-		free(ScreenData);
-	ScreenData = (BYTE*)malloc(4 * ScreenX * ScreenY);
+	if (screenSizeChanged) {
+		if (ScreenData)
+			free(ScreenData);
+		ScreenData = (BYTE*)malloc(4 * ScreenX * ScreenY);
+		screenSizeChanged = false;
+	}
 
 	GetDIBits(hdcMem, hBitmap, 0, ScreenY, ScreenData, (BITMAPINFO*)&bmi, DIB_RGB_COLORS);
 
@@ -184,7 +184,7 @@ RGB getPixelAvg(unsigned int xStart, unsigned int yStart, unsigned int xEnd, uns
 			int pixelBlue= PosB(x, y);
 			if (filterBadColors) {
 				short rgbSum = pixelRed + pixelGreen + pixelBlue;
-				if (rgbSum < 50 || rgbSum > 254 * 3) {
+				if (rgbSum < 50 || rgbSum > 762) { //254*3 = 762
 					numOfSkippedPixels++;
 					continue; //ignore extremely dark/bright colors as they just ruin the average
 				}
@@ -467,6 +467,7 @@ void printLoadedSettings() {
 	std::cout << "Vertical Step: " << stepY << std::endl;
 	std::cout << "Horizontal Zones: " << horizontalZones << std::endl;
 	std::cout << "Vertical Zones: " << verticalZones << std::endl;
+	std::cout << "Pinned App to monitor number: " << pinToMonitor << std::endl;
 	std::cout << "Check for an update on start up is " << (checkForUpdateFF ? "ON" : "OFF") << std::endl;
 	std::cout << "Multi-monitor mode is " << (multiMonitorSupport ? "ON" : "OFF") << std::endl;
 	std::cout << "Keyboard zone coloring is " << (keyboardZoneColoring ? "ON" : "OFF") << std::endl;
@@ -506,6 +507,7 @@ void loadConfigsFromSettingsFile() {
 	stepY = getConfigValAsInt("CONFIGS", "VerticalStep", stepY, 1, 32);
 	horizontalZones = getConfigValAsInt("CONFIGS", "HorizontalZones", horizontalZones, 1, 25);
 	verticalZones = getConfigValAsInt("CONFIGS", "VerticalZones", verticalZones, 1, 25);
+	pinToMonitor = getConfigValAsInt("CONFIGS", "PinToMonitor", pinToMonitor, -1, g_DXGIManager.GetMonitorCount());
 
 	multiMonitorSupport = stringToBool(ini.GetValue("CONFIGS", "MultiMonitorSupport"));
 	checkForUpdateFF = stringToBool(ini.GetValue("CONFIGS", "CheckForUpdateOnStartup"));
@@ -517,15 +519,20 @@ void loadConfigsFromSettingsFile() {
 
 void initDXGI() {
 	CoInitialize(NULL);
-	g_DXGIManager.SetCaptureSource(CSDesktop);
+	//g_DXGIManager.SetCaptureSource(CSDesktop);
+	g_DXGIManager.SetCaptureSourceByIndex(pinToMonitor);
 	g_DXGIManager.Init();
-	pBuf = new BYTE[ScreenX * ScreenY * 4];
 }
 
+void checkMonitorMode() {
+	if (multiMonitorSupport && pinToMonitor != -1) {
+		std::cout << "Warning: PinToMonitor is set to " << pinToMonitor << " while Multi-monitor mode is on.\nIgnoring the PinToMonitor setting.\n" << std::endl;
+		pinToMonitor = -1;
+	}
+}
 
-void handleConfigurations() {
+void handleOptions() {
 	std::string api;
-	//printLoadedSettings();
 	printOptions();
 	while (continueExecution) {
 		char c = getchar();
@@ -552,13 +559,19 @@ void handleConfigurations() {
 				multiMonitorSupport = false;
 				std::cout << "Multi-monitor support is OFF. Using only the primary monitor to calculate the average.\n" << std::endl;
 				setScreenSize();
-				pBuf = new BYTE[ScreenX * ScreenY * 4];
+				if (DXGI) {
+					initDXGI();
+				}
+				//pBuf = new BYTE[ScreenX * ScreenY * 4];
 				break;
 			case '2':
 				multiMonitorSupport = true;
 				std::cout << "Multi-monitor support is ON. Using all monitors to calculate the average.\n" << std::endl;
 				setScreenSize();
-				pBuf = new BYTE[ScreenX * ScreenY * 4];
+				if (DXGI) {
+					initDXGI();
+				}
+				//pBuf = new BYTE[ScreenX * ScreenY * 4];
 				break;
 			case 'o':
 			case 'O':
@@ -575,7 +588,12 @@ void handleConfigurations() {
 			case 'r':
 			case 'R':
 				loadConfigsFromSettingsFile();
+				checkMonitorMode();
+				setScreenSize();
 				printLoadedSettings();
+				if (DXGI) {
+					initDXGI();
+				}
 				break;
 			case 'a':
 			case 'A':
@@ -684,12 +702,15 @@ void checkForAnUpdate() {
 }
 
 
+
 int main(){
 	std::cout << "Starting app" << std::endl;
 	std::cout << "App version: " << version << "\n" << std::endl;
 	SetConsoleCtrlHandler((PHANDLER_ROUTINE)(ctrl_handler), TRUE);
 	loadConfigsFromSettingsFile(); //load configs from settings.ini
+	checkMonitorMode();
 	setScreenSize();
+	
 	std::thread updateThread([] {
 		if (checkForUpdateFF) {
 			std::cout << "Checking for updates..." << std::endl;
@@ -700,6 +721,7 @@ int main(){
 	if (DXGI) {
 		initDXGI();
 	}
+
 	
 	CorsairPerformProtocolHandshake();
 	if (const auto error = CorsairGetLastError()) {
@@ -727,13 +749,13 @@ int main(){
 	std::thread lightingThread([&colorsVector] {
 		while (continueExecution) {
 			if (DXGI) {
-				ScreenData = DXGIScreepCap();
+				DXGIScreepCap();
 				if (ScreenData == NULL) {
 					continue;
 				}
 			}
 			else {
-				ScreenCap();
+				GDIScreenCap();
 			}
 			setLedsColor(getPixelAvg(0, 0, ScreenX, ScreenY), colorsVector);
 			if (keyboardZoneColoring || mousePadZoneColoring) {
@@ -743,7 +765,7 @@ int main(){
 		}
 	});
 	
-	handleConfigurations();
+	handleOptions();
 
 	lightingThread.join();
 	updateThread.join();
