@@ -5,7 +5,6 @@
 #endif
 
 
-#include <curl/curl.h>
 #include <iostream>
 #include <thread>
 #include <vector>
@@ -14,40 +13,21 @@
 #include <cstdlib>
 #include <unordered_set>
 #include <unordered_map>
-#include <SimpleIni.h>
-#include <nlohmann/json.hpp>
 #include <set>
+#include <map>
 #include <math.h>
 #include "DXGIManager.h"
-
-#define version "v2.1"
-#define settingsFileName "settings.ini"
-
-using json = nlohmann::json;
+#include "ConfigsManager.h"
+#include "UpdateManager.h"
+#include "stdafx.h"
 
 struct RGB { short red; short green; short blue; };
 struct Zone { int zoneX; int zoneY; };
 
-int ScreenX = 0;
-int ScreenY = 0;
-int stepX = 5;
-int stepY = 5;
-int horizontalZones = 17;
-int verticalZones = 6;
-int pinToMonitor = -1;
-
-std::atomic_bool continueExecution{ true };
-std::atomic_bool multiMonitorSupport{ true };
-std::atomic_int sleepDuration{ 500 };
-bool checkForUpdateFF = true;
-bool keyboardZoneColoring = true;
-bool mousePadZoneColoring = true;
-bool filterBadColors = true;
-bool DXGI = true;
-bool screenSizeChanged = false;
+ConfigsManager configsManager;
 
 BYTE* ScreenData = 0;
-CSimpleIniA ini;
+
 
 struct postitionComparator {
 	bool operator() (const CorsairLedPosition& led1, const CorsairLedPosition& led2) const{
@@ -85,12 +65,12 @@ void DXGIScreepCap() {
 	DWORD dwWidth = rcDim.right - rcDim.left;
 	DWORD dwHeight = rcDim.bottom - rcDim.top;
 	DWORD dwBufSize = dwWidth * dwHeight * 4;
-	if (screenSizeChanged) {
+	if (configsManager.screenSizeChanged) {
 		if (ScreenData) {
 			free(ScreenData);
 		}
 		ScreenData = (BYTE*)malloc(dwBufSize);
-		screenSizeChanged = false;
+		configsManager.screenSizeChanged = false;
 	}
 
 	HRESULT hr;
@@ -109,42 +89,42 @@ void DXGIScreepCap() {
 
 
 void setScreenSize() {
-	screenSizeChanged = true;
-	if (multiMonitorSupport.load()) {
-		ScreenX = GetSystemMetrics(SM_CXVIRTUALSCREEN);
-		ScreenY = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+	configsManager.screenSizeChanged = true;
+	if (configsManager.multiMonitorSupport.load()) {
+		configsManager.ScreenX = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+		configsManager.ScreenY = GetSystemMetrics(SM_CYVIRTUALSCREEN);
 	}
 	else {
-		ScreenX = GetSystemMetrics(SM_CXSCREEN);
-		ScreenY = GetSystemMetrics(SM_CYSCREEN);
+		configsManager.ScreenX = GetSystemMetrics(SM_CXSCREEN);
+		configsManager.ScreenY = GetSystemMetrics(SM_CYSCREEN);
 	}
 }
 
 void GDIScreenCap(){
 	HDC hScreen = GetDC(GetDesktopWindow());
 	HDC hdcMem = CreateCompatibleDC(hScreen);
-	HBITMAP hBitmap = CreateCompatibleBitmap(hScreen, ScreenX, ScreenY);
+	HBITMAP hBitmap = CreateCompatibleBitmap(hScreen, configsManager.ScreenX, configsManager.ScreenY);
 	HGDIOBJ hOld = SelectObject(hdcMem, hBitmap);
-	BitBlt(hdcMem, 0, 0, ScreenX, ScreenY, hScreen, 0, 0, SRCCOPY);
+	BitBlt(hdcMem, 0, 0, configsManager.ScreenX, configsManager.ScreenY, hScreen, 0, 0, SRCCOPY);
 	SelectObject(hdcMem, hOld);
 
 	BITMAPINFOHEADER bmi = { 0 };
 	bmi.biSize = sizeof(BITMAPINFOHEADER);
 	bmi.biPlanes = 1;
 	bmi.biBitCount = 32;
-	bmi.biWidth = ScreenX;
-	bmi.biHeight = -ScreenY;
+	bmi.biWidth = configsManager.ScreenX;
+	bmi.biHeight = -configsManager.ScreenY;
 	bmi.biCompression = BI_RGB;
 	bmi.biSizeImage = 0;// 3 * ScreenX * ScreenY;
 
-	if (screenSizeChanged) {
+	if (configsManager.screenSizeChanged) {
 		if (ScreenData)
 			free(ScreenData);
-		ScreenData = (BYTE*)malloc(4 * ScreenX * ScreenY);
-		screenSizeChanged = false;
+		ScreenData = (BYTE*)malloc(4 * configsManager.ScreenX * configsManager.ScreenY);
+		configsManager.screenSizeChanged = false;
 	}
 
-	GetDIBits(hdcMem, hBitmap, 0, ScreenY, ScreenData, (BITMAPINFO*)&bmi, DIB_RGB_COLORS);
+	GetDIBits(hdcMem, hBitmap, 0, configsManager.ScreenY, ScreenData, (BITMAPINFO*)&bmi, DIB_RGB_COLORS);
 
 	ReleaseDC(GetDesktopWindow(), hScreen);
 	DeleteDC(hdcMem);
@@ -155,17 +135,17 @@ void GDIScreenCap(){
 
 inline int PosB(int x, int y)
 {
-	return ScreenData[4 * ((y*ScreenX) + x)];
+	return ScreenData[4 * ((y*configsManager.ScreenX) + x)];
 }
 
 inline int PosG(int x, int y)
 {
-	return ScreenData[4 * ((y*ScreenX) + x) + 1];
+	return ScreenData[4 * ((y*configsManager.ScreenX) + x) + 1];
 }
 
 inline int PosR(int x, int y)
 {
-	return ScreenData[4 * ((y*ScreenX) + x) + 2];
+	return ScreenData[4 * ((y*configsManager.ScreenX) + x) + 2];
 }
 
 RGB getPixelAvg(unsigned int xStart, unsigned int yStart, unsigned int xEnd, unsigned int yEnd){
@@ -176,13 +156,13 @@ RGB getPixelAvg(unsigned int xStart, unsigned int yStart, unsigned int xEnd, uns
 	unsigned long numOfSkippedPixels = 0;
 	const short lowColorDiff = 25;
 
-	for (unsigned int x = xStart; x < xEnd; x = x + stepX) {
-		for (unsigned int y = yStart; y < yEnd; y = y + stepY) {
+	for (unsigned int x = xStart; x < xEnd; x = x + configsManager.stepX) {
+		for (unsigned int y = yStart; y < yEnd; y = y + configsManager.stepY) {
 			totalZonePixels++;
 			int pixelRed = PosR(x, y);
 			int pixelGreen = PosG(x, y);
 			int pixelBlue= PosB(x, y);
-			if (filterBadColors) {
+			if (configsManager.filterBadColors) {
 				short rgbSum = pixelRed + pixelGreen + pixelBlue;
 				if (rgbSum < 50 || rgbSum > 762) { //254*3 = 762
 					numOfSkippedPixels++;
@@ -268,13 +248,13 @@ std::vector<CorsairLedColor> getAvailableKeys(){
 				colorsSet.insert(CLH_RightLogo);
 			} break;
 			case CDT_Keyboard: {
-				if (keyboardZoneColoring) {
+				if (configsManager.keyboardZoneColoring) {
 					mapDeviceToSortedLeds(deviceIndex, deviceInfo);
 					break;
 				}
 			}
 			case CDT_MouseMat: {
-				if (mousePadZoneColoring && deviceInfo->type != CDT_Keyboard) {
+				if (configsManager.mousePadZoneColoring && deviceInfo->type != CDT_Keyboard) {
 					mapDeviceToSortedLeds(deviceIndex, deviceInfo);
 					break;
 				}
@@ -326,10 +306,10 @@ std::set<int> resizeSet(std::set<int> someSet, int desiredSize) {
 void avgColorByZone(int horizontalZones, int verticalZones) {
 	for (int horizontalZoneId = 0; horizontalZoneId < horizontalZones; horizontalZoneId++) {
 		for (int verticalZoneId = 0; verticalZoneId < verticalZones; verticalZoneId++) {
-			unsigned int xStart = horizontalZoneId * (ScreenX / horizontalZones);
-			unsigned int yStart = verticalZoneId * (ScreenY / verticalZones);
-			unsigned int xEnd = (horizontalZoneId + 1) * (ScreenX / horizontalZones);
-			unsigned int yEnd = (verticalZoneId + 1) * (ScreenY / verticalZones);
+			unsigned int xStart = horizontalZoneId * (configsManager.ScreenX / horizontalZones);
+			unsigned int yStart = verticalZoneId * (configsManager.ScreenY / verticalZones);
+			unsigned int xEnd = (horizontalZoneId + 1) * (configsManager.ScreenX / horizontalZones);
+			unsigned int yEnd = (verticalZoneId + 1) * (configsManager.ScreenY / verticalZones);
 			RGB avgRgbPerZone = getPixelAvg(xStart, yStart, xEnd, yEnd);
 			Zone zone = {horizontalZoneId, verticalZoneId};
 			zoneToRGBmap[zone] = { avgRgbPerZone.red, avgRgbPerZone.green, avgRgbPerZone.blue};
@@ -356,8 +336,8 @@ void mapLedsToZones() {
 			}
 
 
-			leftValuesSet = resizeSet(leftValuesSet, horizontalZones);
-			topValuesSet = resizeSet(topValuesSet, verticalZones);
+			leftValuesSet = resizeSet(leftValuesSet, configsManager.horizontalZones);
+			topValuesSet = resizeSet(topValuesSet, configsManager.verticalZones);
 
 			for (auto& ledPos : deviceToLedPositionsMap[currentDevice]) {
 				std::set<int>::iterator leftIterator = leftValuesSet.begin();
@@ -391,7 +371,7 @@ void mapLedsToZones() {
 
 
 void zoneColoring() {
-	avgColorByZone(horizontalZones, verticalZones);
+	avgColorByZone(configsManager.horizontalZones, configsManager.verticalZones);
 	for (auto& device : deviceLedsToZonesMap) {
 		auto currentDevice = device.first;
 		switch (currentDevice) {
@@ -427,14 +407,33 @@ void setLedsColor(RGB avgRgb, std::vector<CorsairLedColor> &ledColorsVec) {
 
 BOOL ctrl_handler(DWORD event){
 	if (event == CTRL_CLOSE_EVENT) { //Handling window close event
-		continueExecution = false;
+		configsManager.continueExecution = false;
 		return TRUE;
 	}
 	return FALSE;
 }
 
+
+void initDXGI() {
+	CoInitialize(NULL);
+	//g_DXGIManager.SetCaptureSource(CSDesktop);
+	g_DXGIManager.SetCaptureSourceByIndex(configsManager.pinToMonitor);
+	if (g_DXGIManager.Init() != S_OK) {
+		std::cout << "Failed to initialize DXGI. Using GDI instead.\n" << std::endl;
+		configsManager.DXGI = false;
+	}
+}
+
+void checkMonitorMode() {
+	if (configsManager.multiMonitorSupport && configsManager.pinToMonitor != -1) {
+		std::cout << "Warning: PinToMonitor is set to " << configsManager.pinToMonitor << " while Multi-monitor mode is on.\nIgnoring the PinToMonitor setting.\n" << std::endl;
+		configsManager.pinToMonitor = -1;
+	}
+}
+
+
 void printRefeshInterval() {
-	std::cout << "Refresh interval set to " << sleepDuration.load() << " milliseconds" << std::endl;
+	std::cout << "Refresh interval set to " << configsManager.sleepDuration.load() << " milliseconds" << std::endl;
 }
 
 void printOptions() {
@@ -452,273 +451,106 @@ void printOptions() {
 	std::cout << options << std::endl;
 }
 
-bool stringToBool(std::string str) {
-	if (str.compare("true") == 0 || str.compare("on") == 0 || str.compare("1") == 0) {
-		return true;
-	}
-	else {
-		return false;
-	}
-}
-
-void printLoadedSettings() {
-	std::cout << "Refresh interval: " << sleepDuration.load() << " milliseconds" << std::endl;
-	std::cout << "Horizontal Step: " << stepX << std::endl;
-	std::cout << "Vertical Step: " << stepY << std::endl;
-	std::cout << "Horizontal Zones: " << horizontalZones << std::endl;
-	std::cout << "Vertical Zones: " << verticalZones << std::endl;
-	std::cout << "Pinned App to monitor number: " << pinToMonitor << std::endl;
-	std::cout << "Check for an update on start up is " << (checkForUpdateFF ? "ON" : "OFF") << std::endl;
-	std::cout << "Multi-monitor mode is " << (multiMonitorSupport ? "ON" : "OFF") << std::endl;
-	std::cout << "Keyboard zone coloring is " << (keyboardZoneColoring ? "ON" : "OFF") << std::endl;
-	std::cout << "Mousepad zone coloring is " << (mousePadZoneColoring ? "ON" : "OFF") << std::endl;
-	std::cout << "Filter bad colors is " << (filterBadColors ? "ON" : "OFF") << "\n" << std::endl;
-}
-
-int getConfigValAsInt(const char* section, const char* key, int defaultVal, int rangeLowerBound, int rangeUpperBound) {
-	int res;
-	try {
-		res = std::stoi(ini.GetValue(section, key), nullptr);
-		if (rangeLowerBound && rangeUpperBound && (res < rangeLowerBound || res > rangeUpperBound)) {
-			std::cout << "Error: the setting \"" <<  key << "\" must be between " << rangeLowerBound << " and " << rangeUpperBound << std::endl;
-			std::cout << "Using a default value instead: " << defaultVal << "\n" << std::endl;
-			res = defaultVal;
-		}
-	}
-	catch (const std::exception&) {
-		std::cout << "Failed to read the value of " << key << " from the settings file" << std::endl;
-		std::cout << "Using a default value instead: " << defaultVal << "\n" << std::endl;
-		res = defaultVal;
-	}
-	return res;
-}
-
-void loadConfigsFromSettingsFile() {
-	ini.SetUnicode();
-	int rc = ini.LoadFile(settingsFileName);
-	if (rc < 0) {
-		std::cout << "Failed to load the settings file: " << settingsFileName << std::endl;
-		return;
-	}
-
-	sleepDuration = getConfigValAsInt("CONFIGS", "RefreshInterval", sleepDuration, 15, 1000);
-
-	stepX = getConfigValAsInt("CONFIGS", "HorizontalStep", stepX, 1, 32);
-	stepY = getConfigValAsInt("CONFIGS", "VerticalStep", stepY, 1, 32);
-	horizontalZones = getConfigValAsInt("CONFIGS", "HorizontalZones", horizontalZones, 1, 25);
-	verticalZones = getConfigValAsInt("CONFIGS", "VerticalZones", verticalZones, 1, 25);
-	pinToMonitor = getConfigValAsInt("CONFIGS", "PinToMonitor", pinToMonitor, -1, g_DXGIManager.GetMonitorCount());
-
-	multiMonitorSupport = stringToBool(ini.GetValue("CONFIGS", "MultiMonitorSupport"));
-	checkForUpdateFF = stringToBool(ini.GetValue("CONFIGS", "CheckForUpdateOnStartup"));
-	keyboardZoneColoring = stringToBool(ini.GetValue("CONFIGS", "KeyboardZoneColoring"));
-	mousePadZoneColoring = stringToBool(ini.GetValue("CONFIGS", "MousePadZoneColoring"));
-	filterBadColors = stringToBool(ini.GetValue("CONFIGS", "FilterBadColors"));
-	DXGI = stringToBool(ini.GetValue("CONFIGS", "DXGI_API"));
-}
-
-void initDXGI() {
-	CoInitialize(NULL);
-	//g_DXGIManager.SetCaptureSource(CSDesktop);
-	g_DXGIManager.SetCaptureSourceByIndex(pinToMonitor);
-	g_DXGIManager.Init();
-}
-
-void checkMonitorMode() {
-	if (multiMonitorSupport && pinToMonitor != -1) {
-		std::cout << "Warning: PinToMonitor is set to " << pinToMonitor << " while Multi-monitor mode is on.\nIgnoring the PinToMonitor setting.\n" << std::endl;
-		pinToMonitor = -1;
-	}
-}
-
 void handleOptions() {
-	std::string api;
 	printOptions();
-	while (continueExecution) {
+	while (configsManager.continueExecution) {
 		char c = getchar();
 		switch (c) {
-			case '-':
-				if (sleepDuration.load() > 100) {
-					sleepDuration -= 100;
-					printRefeshInterval();
-				}
-				else {
-					std::cout << "Cannot decrease the refesh interval any further" << std::endl;
-				}
-				break;
-			case '+':
-				if (sleepDuration.load() < 1000) {
-					sleepDuration += 100;
-					printRefeshInterval();
-				}
-				else {
-					std::cout << "Cannot increase the refesh interval any further" << std::endl;
-				}
-				break;
-			case '1':
-				multiMonitorSupport = false;
-				std::cout << "Multi-monitor support is OFF. Using only the primary monitor to calculate the average.\n" << std::endl;
-				setScreenSize();
-				if (DXGI) {
-					initDXGI();
-				}
-				//pBuf = new BYTE[ScreenX * ScreenY * 4];
-				break;
-			case '2':
-				multiMonitorSupport = true;
-				std::cout << "Multi-monitor support is ON. Using all monitors to calculate the average.\n" << std::endl;
-				setScreenSize();
-				if (DXGI) {
-					initDXGI();
-				}
-				//pBuf = new BYTE[ScreenX * ScreenY * 4];
-				break;
-			case 'o':
-			case 'O':
-				printOptions();
-				break;
-			case 's':
-			case 'S':
-				printLoadedSettings();
-				break;
-			case 'Q':
-			case 'q':
-				continueExecution = false;
-				break;
-			case 'r':
-			case 'R':
-				loadConfigsFromSettingsFile();
-				checkMonitorMode();
-				setScreenSize();
-				printLoadedSettings();
-				if (DXGI) {
-					initDXGI();
-				}
-				break;
-			case 'a':
-			case 'A':
-				DXGI = !DXGI;
-				api = DXGI ? "DXGI" : "GDI";
-				std::cout << "Using " << api << " API to capture the screen." << std::endl;
-				if (DXGI) {
-					initDXGI();
-				}
-				else {
-					std::cout << "Please note that DXGI is much faster than GDI." << std::endl;
-				}
-				break;
-			default:
-				break;
+		case '-':
+			if (configsManager.sleepDuration.load() > 100) {
+				configsManager.sleepDuration -= 100;
+				printRefeshInterval();
 			}
-	}
-}
-
-
-size_t CurlWrite_CallbackFunc_StdString(void *contents, size_t size, size_t nmemb, std::string *s){
-	size_t newLength = size * nmemb;
-	size_t oldLength = s->size();
-	try{
-		s->resize(oldLength + newLength);
-	}
-	catch (std::bad_alloc &e){
-		//handle memory problem
-		std::cout << "Error: couldn't allocate enough memory for the HTTP response" << std::endl;
-		std::cout << e.what() << std::endl;
-		return 0;
-	}
-
-	std::copy((char*)contents, (char*)contents + newLength, s->begin() + oldLength);
-	return size * nmemb;
-}
-
-void checkForAnUpdate() {
-	try {
-		CURL *curl;
-		CURLcode res;
-		std::string response;
-		curl_global_init(CURL_GLOBAL_DEFAULT);
-		struct curl_slist *list = NULL;
-		curl = curl_easy_init();
-		if (curl) {
-			curl_easy_setopt(curl, CURLOPT_URL, "https://api.github.com/repos/hamodyk/Corsair-Ambience/releases/latest");
-			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString);
-			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-			list = curl_slist_append(list, "User-Agent: C/1.0");
-			curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
-
-			#ifdef SKIP_PEER_VERIFICATION
-			/*
-			* If you want to connect to a site who isn't using a certificate that is
-			* signed by one of the certs in the CA bundle you have, you can skip the
-			* verification of the server's certificate. This makes the connection
-			* A LOT LESS SECURE.
-			*
-			* If you have a CA cert for the server stored someplace else than in the
-			* default bundle, then the CURLOPT_CAPATH option might come handy for
-			* you.
-			*/
-			curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-			#endif
-
-			#ifdef SKIP_HOSTNAME_VERIFICATION
-			/*
-			* If the site you're connecting to uses a different host name that what
-			* they have mentioned in their server certificate's commonName (or
-			* subjectAltName) fields, libcurl will refuse to connect. You can skip
-			* this check, but this will make the connection less secure.
-			*/
-			curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-			#endif
-
-			/* Perform the request, res will get the return code */
-			res = curl_easy_perform(curl);
-			/* Check for errors */
-			if (res != CURLE_OK) {
-				//fprintf(stderr, "curl_easy_perform() failed: %s\n",curl_easy_strerror(res));
-				std::cout << "Error: Unable to retrieve information about the latest version from Github" << std::endl;
-				std::cout << curl_easy_strerror(res) << "\n" << std::endl;
-				return;
+			else {
+				std::cout << "Cannot decrease the refesh interval any further" << std::endl;
 			}
-
-			/* always cleanup */
-			curl_easy_cleanup(curl);
-			curl_slist_free_all(list);
-		}
-
-		curl_global_cleanup();
-
-		auto js = json::parse(response);
-		std::string latestVersion = js["tag_name"];
-		std::string currentVersion = version;
-		if (latestVersion.compare(currentVersion) != 0) { //if they are not equal
-			std::cout << "a new version (" << latestVersion << ") is available to download!" << std::endl;
-			std::cout << "Visit " << "https://github.com/hamodyk/Corsair-Ambience" << " for more info" << std::endl;
+			break;
+		case '+':
+			if (configsManager.sleepDuration.load() < 1000) {
+				configsManager.sleepDuration += 100;
+				printRefeshInterval();
+			}
+			else {
+				std::cout << "Cannot increase the refesh interval any further" << std::endl;
+			}
+			break;
+		case '1':
+			configsManager.multiMonitorSupport = false;
+			if (configsManager.pinToMonitor == -1 || configsManager.pinToMonitor == 0) {
+				configsManager.pinToMonitor = 1;
+			}
+			std::cout << "Multi-monitor support is OFF\n" << std::endl;
+			setScreenSize();
+			if (configsManager.DXGI) {
+				initDXGI();
+			}
+			break;
+		case '2':
+			configsManager.multiMonitorSupport = true;
+			if (configsManager.pinToMonitor != -1) {
+				configsManager.pinToMonitor = -1;
+			}
+			std::cout << "Multi-monitor support is ON\n" << std::endl;
+			setScreenSize();
+			if (configsManager.DXGI) {
+				initDXGI();
+			}
+			break;
+		case 'o':
+		case 'O':
+			printOptions();
+			break;
+		case 's':
+		case 'S':
+			configsManager.printLoadedSettings();
+			break;
+		case 'Q':
+		case 'q':
+			configsManager.continueExecution = false;
+			break;
+		case 'r':
+		case 'R':
+			configsManager.loadConfigsFromSettingsFile();
+			checkMonitorMode();
+			setScreenSize();
+			configsManager.printLoadedSettings();
+			if (configsManager.DXGI) {
+				initDXGI();
+			}
+			break;
+		case 'a':
+		case 'A':
+			configsManager.DXGI = !configsManager.DXGI;
+			std::cout << "Using " << (configsManager.DXGI ? "DXGI" : "GDI") << " API to capture the screen." << std::endl;
+			if (configsManager.DXGI) {
+				initDXGI();
+			}
+			else {
+				std::cout << "Please note that DXGI is much faster than GDI." << std::endl;
+			}
+			break;
+		default:
+			break;
 		}
 	}
-	catch (const std::exception& e) {
-		std::cout << "Error: Unable to retrieve information about the latest version from Github" << std::endl;
-		std::cout << e.what() << "\n" << std::endl;
-	}
 }
-
-
 
 int main(){
 	std::cout << "Starting app" << std::endl;
 	std::cout << "App version: " << version << "\n" << std::endl;
 	SetConsoleCtrlHandler((PHANDLER_ROUTINE)(ctrl_handler), TRUE);
-	loadConfigsFromSettingsFile(); //load configs from settings.ini
+	configsManager.loadConfigsFromSettingsFile(); //load configs from settings.ini
 	checkMonitorMode();
 	setScreenSize();
 	
 	std::thread updateThread([] {
-		if (checkForUpdateFF) {
+		if (configsManager.checkForUpdateFF) {
 			std::cout << "Checking for updates..." << std::endl;
-			checkForAnUpdate();
+			UpdateManager::checkForAnUpdate();
 		}
 	});
 
-	if (DXGI) {
+	if (configsManager.DXGI) {
 		initDXGI();
 	}
 
@@ -738,7 +570,7 @@ int main(){
 
 	auto colorsVector = getAvailableKeys();
 	std::cout << "Available LED keys: " << colorsVector.size() << std::endl;
-	if (colorsVector.empty() && !keyboardZoneColoring && !mousePadZoneColoring) {
+	if (colorsVector.empty() && !configsManager.keyboardZoneColoring && !configsManager.mousePadZoneColoring) {
 		std::cout << "No LED keys available" << "\nPress any key to quit." << std::endl;
 		getchar();
 		return 1;
@@ -747,8 +579,8 @@ int main(){
 	std::cout << "Running..." << "\n" << std::endl;
 	mapLedsToZones();
 	std::thread lightingThread([&colorsVector] {
-		while (continueExecution) {
-			if (DXGI) {
+		while (configsManager.continueExecution) {
+			if (configsManager.DXGI) {
 				DXGIScreepCap();
 				if (ScreenData == NULL) {
 					continue;
@@ -757,11 +589,11 @@ int main(){
 			else {
 				GDIScreenCap();
 			}
-			setLedsColor(getPixelAvg(0, 0, ScreenX, ScreenY), colorsVector);
-			if (keyboardZoneColoring || mousePadZoneColoring) {
+			setLedsColor(getPixelAvg(0, 0, configsManager.ScreenX, configsManager.ScreenY), colorsVector);
+			if (configsManager.keyboardZoneColoring || configsManager.mousePadZoneColoring) {
 				zoneColoring();
 			}
-			std::this_thread::sleep_for(std::chrono::milliseconds(sleepDuration.load()));
+			std::this_thread::sleep_for(std::chrono::milliseconds(configsManager.sleepDuration.load()));
 		}
 	});
 	

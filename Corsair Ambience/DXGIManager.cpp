@@ -273,8 +273,6 @@ HRESULT DXGIManager::Init()
 			if (FAILED(hr))
 			{
 				//__L_ERROR("Failed to duplicate output hr=%08x", hr);
-				printf("\nError: %08x. DXGI requires DirectX 11 and at least Windows 8. \n", hr);
-				printf("Please switch the API to 'GDI' in the settings.ini file.\n\n", hr);
 				continue;
 			}
 
@@ -285,6 +283,12 @@ HRESULT DXGIManager::Init()
 					spDXGIOutput1,
 					spDXGIOutputDuplication));
 		}
+	}
+
+	if (m_vOutputs.size() == 0) {
+		printf("\nError: %08x. DXGI requires DirectX 11 and at least Windows 8. \n", hr);
+		printf("Please turn off DXGI_API in the settings.ini file.\n\n");
+		return hr;
 	}
 
 	hr = m_spWICFactory.CoCreateInstance(CLSID_WICImagingFactory);

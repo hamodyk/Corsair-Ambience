@@ -145,12 +145,16 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Ambience.cpp" />
+    <ClCompile Include="ConfigsManager.cpp" />
     <ClCompile Include="DXGIManager.cpp" />
+    <ClCompile Include="UpdateManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ConfigsManager.h" />
     <ClInclude Include="DXGIManager.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="UpdateManager.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

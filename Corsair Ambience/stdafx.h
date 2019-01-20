@@ -13,6 +13,8 @@
 
 using namespace std;
 
+#define version "v2.1"
+
 #define LOG_FILENAME "logfile.log"
 #define BUF_SIZE 512
 #define __L_INFO(format, ...) { FILE* fp = NULL; fopen_s(&fp, LOG_FILENAME, "a+"); if(fp) { char buf[BUF_SIZE]; _snprintf_s(buf, BUF_SIZE, _TRUNCATE, format, __VA_ARGS__); fprintf(fp, buf); fprintf(fp, "\n"); fclose(fp); }}
