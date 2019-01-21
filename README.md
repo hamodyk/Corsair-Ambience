@@ -12,7 +12,7 @@ Keep in mind that this was filmed using my phone, so I can assure you it looks m
 
 # Download & Run
 
-[Click here to download the latest version (v2.0)](https://github.com/hamodyk/Corsair-Ambience/releases/download/v2.0/Corsair.Ambience.v2.0.rar)
+[Click here to download the latest version (v2.1)](https://github.com/hamodyk/Corsair-Ambience/releases/download/v2.1/Corsair.Ambience.v2.1.rar)
 
 #### Please make sure that you have either iCUE or CUE running before you start the app.
 
@@ -27,7 +27,7 @@ To install and debug the project you need to do the following:
 2. Copy include, lib and redist folder into the Root of the project
 3. Go to Project properties-->C/C++-->General-->Additional Include Directories, Add the follow line: $(SolutionDir)include\
 4. Go to Project properties-->Linker->General-->Additional Library Directories, Add the follow line: $(SolutionDir)lib\x64\
-5. Go to Project properties-->Linker->Input-->Additional Dependencies, add follow line in front of it: libcurl.lib;CUESDK.x64_2013.lib;
+5. Go to Project properties-->Linker->Input-->Additional Dependencies, set it to the following: D3D11.lib;dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;gdiplus.lib;libcurl.lib;CUESDK.x64_2013.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)
 6. Go to Project properties-->Build Events-->Pre-Build Event-->Command Line, add following line: xcopy  /Y /I  "$(SolutionDir)settings.ini" "$(OutDir)"
 6. Go to Project properties-->Build Events-->Post-Build Event-->Command Line, add following line: xcopy /Y /I "$(SolutionDir)redist\x64\*" "$(OutDir)"
 7. Apply all of those
@@ -76,6 +76,7 @@ A: Yes
 - [Libcurl](https://github.com/curl/curl) - for using http requests get the latest version of the app from Github
 - [JSON for modern C++](https://github.com/nlohmann/json) - for parsing curl's http response as json and extracting the latest version
 - [SimpleINI](https://github.com/brofield/simpleini) - for the parsing the settings file
+- [DXGI Capture Sample](https://github.com/pgurenko/DXGICaptureSample) - for using DXGI API instead of GDI to capture the screen
 
 # Donations
 If you enjoy this application and would like to support its development, here's my: 
