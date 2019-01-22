@@ -17,11 +17,9 @@ Keep in mind that this was filmed using my phone, so I can assure you it looks m
 #### Please make sure that you have either iCUE or CUE running before you start the app.
 
 To run it, simply open the .rar file, inside it you'll find a folder called "Corsair Ambience v...", open it and double click on "Corsair Ambience.exe".
-
 You can also extract the .rar file, which will create a folder with the .exe inside it.
 
-# Project installation
-[Follow the steps here](https://github.com/hamodyk/Corsair-Ambience/blob/master/Project%20installation)
+To install the project on your Visual Studio, [follow the steps here](https://github.com/hamodyk/Corsair-Ambience/blob/master/Project%20installation)
 
 
 # DISCLAIMERS: 
