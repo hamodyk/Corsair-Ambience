@@ -21,21 +21,7 @@ To run it, simply open the .rar file, inside it you'll find a folder called "Cor
 You can also extract the .rar file, which will create a folder with the .exe inside it.
 
 # Project installation
-To install and debug the project you need to do the following:
-
-1. Start a C++ console project in Visual Studio 2017
-2. Copy include, lib and redist folder into the Root of the project
-3. Go to Project properties-->C/C++-->General-->Additional Include Directories, Add the follow line: $(SolutionDir)include\
-4. Go to Project properties-->Linker->General-->Additional Library Directories, Add the follow line: $(SolutionDir)lib\x64\
-5. Go to Project properties-->Linker->Input-->Additional Dependencies, set it to the following: D3D11.lib;dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;gdiplus.lib;libcurl.lib;CUESDK.x64_2013.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)
-6. Go to Project properties-->Build Events-->Pre-Build Event-->Command Line, add following line: xcopy  /Y /I  "$(SolutionDir)settings.ini" "$(OutDir)"
-6. Go to Project properties-->Build Events-->Post-Build Event-->Command Line, add following line: xcopy /Y /I "$(SolutionDir)redist\x64\*" "$(OutDir)"
-7. Apply all of those
-
-Notes: 
-- All of the above should already be set for you if you just clone the project
-- You might need to retarget the solution (Right click on the Solution 'Corsair Ambience' then choose 'Retarget solution')
-- Your run mode (Debug or Release) must be set to x64 for the settings above to work
+[Follow the steps here](https://github.com/hamodyk/Corsair-Ambience/blob/master/Project%20installation)
 
 
 # DISCLAIMERS: 
