@@ -39,14 +39,23 @@ To install the project on your Visual Studio, [follow the steps here](https://gi
 - Every Corsair RGB device (as of 29/12/2018)
 
 # Road Map
-- Create a GUI
-- Add more configurations (such as sleep time, number of pixels to sample etc...) - ![](https://img.shields.io/badge/status-done-brightgreen.svg)
+![](https://img.shields.io/badge/status-done-brightgreen.svg)
+
+- Multi-monitor support
+
+- Add more configurations (such as sleep time, number of pixels to sample etc...)
+
 - Add more coloring options (such as most dominant color, elimination of dark colors etc...)
-- Make it an installable app
-- Add option to start the app on Windows start up
-- Multi-monitor support - ![](https://img.shields.io/badge/status-done-brightgreen.svg)
+
 - Improve performance
-- Performance impact testing
+
+- Make it an installable app
+
+![](https://img.shields.io/badge/Status-To%20Do-orange.svg)
+
+- Create a GUI
+
+- Add option to start the app on Windows start up
 
 # Q&A
 Q: Does the app also work while using fullscreen applications such as games?
