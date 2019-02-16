@@ -12,7 +12,13 @@ Keep in mind that this was filmed using my phone, so I can assure you it looks m
 
 # Download & Run
 
-[Click here to download the latest version (v2.1)](https://github.com/hamodyk/Corsair-Ambience/releases/download/v2.1/Corsair.Ambience.v2.1.rar)
+To download the latest version, click on one of the links below
+
+[v2.1 - Installer (recommended)](https://github.com/hamodyk/Corsair-Ambience/releases/download/v2.1/AmbienceInstaller.msi)
+
+[v2.1 - Portable rar](https://github.com/hamodyk/Corsair-Ambience/releases/download/v2.1/Corsair.Ambience.v2.1.rar)
+
+
 
 #### Please make sure that you have either iCUE or CUE running before you start the app.
 
