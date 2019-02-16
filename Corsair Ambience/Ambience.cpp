@@ -539,6 +539,20 @@ int main(){
 	std::cout << "Starting app" << std::endl;
 	std::cout << "App version: " << version << "\n" << std::endl;
 	SetConsoleCtrlHandler((PHANDLER_ROUTINE)(ctrl_handler), TRUE);
+
+	CorsairPerformProtocolHandshake();
+	if (const auto error = CorsairGetLastError()) {
+		std::cout << "Handshake failed: " << toString(error) << "\n" << std::endl;
+		std::cout << "Please make sure that either iCUE or CUE are running before you start the app." << std::endl;
+		std::cout << "Also, make sure that \"Enable SDK\" is ticked in the settings." << std::endl;
+		std::cout << "If it's already on, try to set it to off then back on again.\n" << std::endl;
+		std::cout << "Enter any key to quit..." << std::endl;
+		getchar();
+		return -1;
+	}
+	CorsairRequestControl(CAM_ExclusiveLightingControl);
+	//CorsairSetLayerPriority(129);
+
 	configsManager.loadConfigsFromSettingsFile(); //load configs from settings.ini
 	checkMonitorMode();
 	setScreenSize();
@@ -555,18 +569,7 @@ int main(){
 	}
 
 	
-	CorsairPerformProtocolHandshake();
-	if (const auto error = CorsairGetLastError()) {
-		std::cout << "Handshake failed: " << toString(error) << "\n" << std::endl;
-		std::cout << "Please make sure that either iCUE or CUE are running before you start the app." << std::endl;
-		std::cout << "Also, make sure that \"Enable SDK\" is ticked in the settings." << std::endl;
-		std::cout << "If it's already on, try to set it to off then back on again.\n" << std::endl;
-		std::cout << "Enter any key to quit..." << std::endl;
-		getchar();
-		return -1;
-	}
-	CorsairRequestControl(CAM_ExclusiveLightingControl);
-	//CorsairSetLayerPriority(129);
+
 
 	auto colorsVector = getAvailableKeys();
 	std::cout << "Available LED keys: " << colorsVector.size() << std::endl;
