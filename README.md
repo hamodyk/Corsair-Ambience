@@ -12,7 +12,7 @@ Keep in mind that this was filmed using my phone, so I can assure you it looks m
 
 # Download & Run
 
-To download the latest version, click on one of the links below
+To download the latest version, click on one of the following links:
 
 [v2.1 - Installer (recommended)](https://github.com/hamodyk/Corsair-Ambience/releases/download/v2.1/AmbienceInstaller.msi)
 
